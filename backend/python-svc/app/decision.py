@@ -12,6 +12,16 @@ def tr(locale: str, hk: str, en: str, cn: str) -> str:
     return {"zh-HK": hk, "en": en, "zh-CN": cn}.get(locale, hk)
 
 
+# 风险等级有序映射，用于证券合适性等「承受度 vs 产品风险」比较。
+_RISK_ORDER = {"低": 1, "中": 2, "高": 3}
+
+
+def _risk_level(v: object) -> int:
+    if isinstance(v, str) and v in _RISK_ORDER:
+        return _RISK_ORDER[v]
+    return 0
+
+
 def assess(
     vertical: Vertical,
     extracted: dict,
@@ -71,6 +81,106 @@ def assess(
                    "KYC 未完成。",
                    "KYC not completed.",
                    "KYC 未完成。")
+            )
+
+    elif vertical == Vertical.banking_mortgage:
+        ltv = extracted.get("贷款成数LTV")
+        if ltv is not None and ltv > 0.6:
+            risk_score += 30
+            reasons.append(
+                tr(locale,
+                   "按揭成數(LTV)超 HKMA 上限 60%，需按揭保險或加壓力測試。",
+                   "Loan-to-value (LTV) exceeds the HKMA 60% cap; mortgage insurance or stress test required.",
+                   "按揭成数(LTV)超 HKMA 上限 60%，需按揭保险或加压力测试。")
+            )
+        dsr = extracted.get("供款入息比率DSR")
+        if dsr is not None and dsr > 0.5:
+            risk_score += 25
+            reasons.append(
+                tr(locale,
+                   "供款入息比率(DSR)超 50%，還款能力存疑。",
+                   "Debt-servicing ratio (DSR) exceeds 50%; repayment capacity questionable.",
+                   "供款入息比率(DSR)超 50%，还款能力存疑。")
+            )
+        if not extracted.get("首期资金来源"):
+            risk_score += 15
+            reasons.append(
+                tr(locale,
+                   "缺少首期資金來源說明，CDD 不完整。",
+                   "Missing source-of-down-payment explanation; CDD incomplete.",
+                   "缺少首期资金来源说明，CDD 不完整。")
+            )
+
+    elif vertical == Vertical.securities_suitability:
+        client_lv = _risk_level(extracted.get("风险承受度"))
+        product_lv = _risk_level(extracted.get("产品风险等级"))
+        if client_lv and product_lv and product_lv > client_lv:
+            risk_score += 35
+            reasons.append(
+                tr(locale,
+                   "產品風險超出客戶風險承受度，存在不適合性 / 誤售風險。",
+                   "Product risk exceeds client's risk tolerance; unsuitability / mis-selling risk.",
+                   "产品风险超出客户风险承受度，存在不适合性 / 误售风险。")
+            )
+        if product_lv == 3 and extracted.get("投资经验年") is not None and extracted["投资经验年"] < 2:
+            risk_score += 20
+            reasons.append(
+                tr(locale,
+                   "高風險產品但投資經驗不足，需加強風險揭示。",
+                   "High-risk product but insufficient investment experience; enhance risk disclosure.",
+                   "高风险产品但投资经验不足，需加强风险揭示。")
+            )
+
+    elif vertical == Vertical.mpf:
+        if extracted.get("雇主登记状态") == "未登记":
+            risk_score += 30
+            reasons.append(
+                tr(locale,
+                   "僱主未登記強積金計劃，違反 MPFA 合規。",
+                   "Employer not registered for MPF scheme; MPFA non-compliance.",
+                   "雇主未登记强积金计划，违反 MPFA 合规。")
+            )
+        if extracted.get("雇员状态") not in (None, "", "在职", "自雇"):
+            risk_score += 20
+            reasons.append(
+                tr(locale,
+                   "僱員狀態不符供款資格。",
+                   "Employee status does not meet contribution eligibility.",
+                   "雇员状态不符供款资格。")
+            )
+        if extracted.get("供款状态") == "逾期":
+            risk_score += 15
+            reasons.append(
+                tr(locale,
+                   "供款逾期，需跟進。",
+                   "Contributions overdue; follow-up required.",
+                   "供款逾期，需跟进。")
+            )
+
+    elif vertical == Vertical.fund_ofc_lpf:
+        if extracted.get("是否获证监会认可") == "否" and extracted.get("投资者类型") == "零售":
+            risk_score += 40
+            reasons.append(
+                tr(locale,
+                   "未獲證監會認可卻面向零售投資者，違規。",
+                   "Not SFC-authorized yet offered to retail investors; non-compliant.",
+                   "未获证监会认可却面向零售投资者，违规。")
+            )
+        if not extracted.get("受益所有人"):
+            risk_score += 20
+            reasons.append(
+                tr(locale,
+                   "缺少受益所有人，CDD 不完整。",
+                   "Missing beneficial owner; CDD incomplete.",
+                   "缺少受益所有人，CDD 不完整。")
+            )
+        if extracted.get("结构类型") in ("OFC", "LPF", "REIT") and not extracted.get("管理公司"):
+            risk_score += 15
+            reasons.append(
+                tr(locale,
+                   "基金結構已聲明但管理公司缺失，需補正。",
+                   "Fund structure stated but manager missing; needs completion.",
+                   "基金结构已声明但管理公司缺失，需补正。")
             )
 
     # 來自富集服務的高風險信號

@@ -35,18 +35,42 @@ const SAMPLES: Record<string, Record<string, string>> = {
       "投保人：香港環宇保險有限公司\n保單號：HK12345\n受保人：張三\n險種：終身壽險\n保額：800萬\n年繳保費：20萬\n理賠類型：身故\n理賠金額：120萬\n資料完整度：0.9",
     family_office:
       "客戶姓名：陳大文家族辦公室有限公司\n身份類型：公司（家族辦公室）\n資產規模：50,000萬港元\n資金來源：家族持股出售所得\n受益所有人：陳大文\n風險等級：中\nKYC狀態：待補",
+    banking_mortgage:
+      "申請人：李小明\n物業估值：1,000萬\n貸款金額：700萬\n貸款成數LTV：0.7\n月收入：8萬\n月負債供款：5萬\n供款入息比率DSR：0.62\n物業類型：住宅\n首期資金來源：儲蓄\nKYC狀態：完成",
+    securities_suitability:
+      "客戶姓名：王五\n風險承受度：低\n產品風險等級：高\n投資經驗年：1\n財務狀況：200萬\n投資知識水平：低\n產品類型：衍生品\nKYC狀態：完成",
+    mpf:
+      "成員姓名：陳六\n計劃類型：強積金\n僱主名稱：某某有限公司\n僱員狀態：在職\n僱主登記狀態：未登記\n供款狀態：正常\n自願供款：無\nKYC狀態：完成",
+    fund_ofc_lpf:
+      "基金名稱：環宇機會基金\n結構類型：OFC\n是否獲證監會認可：否\n管理公司：環宇資產管理\n投資者類型：零售\n受益所有人：張三\n募資規模：5,000萬\nKYC狀態：完成",
   },
   en: {
     insurance_hk:
       "Policyholder: Hong Kong Universal Insurance Ltd\nPolicy No: HK12345\nInsured: Zhang San\nProduct: Whole Life\nSum Assured: 8,000,000\nAnnual Premium: 200,000\nClaim Type: Death\nClaim Amount: 1,200,000\nCompleteness: 0.9",
     family_office:
       "Client: Chan Tai Man Family Office Ltd\nEntity Type: Company (Family Office)\nAssets: 500,000,000 HKD\nSource of Funds: proceeds from sale of family shareholding\nBeneficial Owner: Chan Tai Man\nRisk Level: Medium\nKYC Status: Pending",
+    banking_mortgage:
+      "Applicant: Li Si\nProperty Valuation: 10,000,000\nLoan Amount: 7,000,000\nLTV: 0.7\nMonthly Income: 80,000\nMonthly Debt Servicing: 50,000\nDSR: 0.62\nProperty Type: Residential\nDown-payment Source: savings\nKYC Status: Completed",
+    securities_suitability:
+      "Client: Wang Wu\nRisk Tolerance: Low\nProduct Risk: High\nInvestment Experience (yrs): 1\nFinancial Situation: 2,000,000\nKnowledge Level: Low\nProduct Type: Derivatives\nKYC Status: Completed",
+    mpf:
+      "Member: Chen Liu\nScheme: MPF\nEmployer: Some Ltd\nEmployment: Employed\nEmployer Registration: Not Registered\nContribution: Normal\nVoluntary: None\nKYC Status: Completed",
+    fund_ofc_lpf:
+      "Fund: Universal Opportunity Fund\nStructure: OFC\nSFC Authorized: No\nManager: Universal Asset Management\nInvestor Type: Retail\nBeneficial Owner: Zhang San\nRaise: 50,000,000\nKYC Status: Completed",
   },
   "zh-CN": {
     insurance_hk:
       "投保人：香港环宇保险有限公司\n保单号：HK12345\n受保人：张三\n险种：终身寿险\n保额：800万\n年缴保费：20万\n理赔类型：身故\n理赔金额：120万\n资料完整度：0.9",
     family_office:
       "客户姓名：陈大文家族办公室有限公司\n身份类型：公司（家族办公室）\n资产规模：500,000万港元\n资金来源：家族持股出售所得\n受益所有人：陈大文\n风险等级：中\nKYC状态：待补",
+    banking_mortgage:
+      "申请人：李四\n物业估值：1,000万\n贷款金额：700万\n贷款成数LTV：0.7\n月收入：8万\n月负债供款：5万\n供款入息比率DSR：0.62\n物业类型：住宅\n首期资金来源：储蓄\nKYC状态：完成",
+    securities_suitability:
+      "客户姓名：王五\n风险承受度：低\n产品风险等级：高\n投资经验年：1\n财务状况：200万\n投资知识水平：低\n产品类型：衍生品\nKYC状态：完成",
+    mpf:
+      "成员姓名：陈六\n计划类型：强积金\n雇主名称：某某有限公司\n雇员状态：在职\n雇主登记状态：未登记\n供款状态：正常\n自愿供款：无\nKYC状态：完成",
+    fund_ofc_lpf:
+      "基金名称：环宇机会基金\n结构类型：OFC\n是否获证监会认可：否\n管理公司：环宇资产管理\n投资者类型：零售\n受益所有人：张三\n募资规模：5000万\nKYC状态：完成",
   },
 };
 

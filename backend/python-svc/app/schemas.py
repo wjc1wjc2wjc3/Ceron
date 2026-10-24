@@ -60,9 +60,63 @@ class GenericProfile(BaseModel):
     KYC状态: Optional[str] = None
 
 
+class BankingMortgageApplication(BaseModel):
+    """银行按揭承保（HKMA 监管）：LTV / DSR / 还款能力 / 首期来源。"""
+    申请人: Optional[str] = None
+    物业估值港币万: Optional[float] = None
+    贷款金额港币万: Optional[float] = None
+    贷款成数LTV: Optional[float] = None          # 0~1，如 0.6
+    月收入港币: Optional[float] = None
+    月负债供款港币: Optional[float] = None
+    供款入息比率DSR: Optional[float] = None       # 总供款/入息，0~1
+    物业类型: Optional[str] = None               # 住宅 / 商用 / 工业
+    首期资金来源: Optional[str] = None
+    KYC状态: Optional[str] = None
+
+
+class SecuritiesSuitabilityProfile(BaseModel):
+    """证券合适性（SFC）：风险承受度 vs 产品风险、经验与知识。"""
+    客户姓名或实体名称: Optional[str] = None
+    风险承受度: Optional[str] = None             # 低 / 中 / 高
+    产品风险等级: Optional[str] = None           # 低 / 中 / 高
+    投资经验年: Optional[float] = None
+    财务状况港币: Optional[float] = None
+    投资知识水平: Optional[str] = None           # 低 / 中 / 高
+    产品类型: Optional[str] = None               # 衍生品 / 基金 / 债券 / 股票
+    KYC状态: Optional[str] = None
+
+
+class MPFProfile(BaseModel):
+    """强积金（MPFA）：雇主登记、雇员资格、供款合规。"""
+    成员姓名或实体名称: Optional[str] = None
+    计划类型: Optional[str] = None               # 强积金 / 职业退休
+    雇主名称: Optional[str] = None
+    雇员状态: Optional[str] = None               # 在职 / 自雇 / 失业
+    雇主登记状态: Optional[str] = None           # 已登记 / 未登记
+    供款状态: Optional[str] = None               # 正常 / 逾期 / 豁免
+    自愿供款: Optional[str] = None
+    KYC状态: Optional[str] = None
+
+
+class FundOFCLPFProfile(BaseModel):
+    """基金 / OFC / LPF / REIT（SFC Type 9）：结构、认可、受益所有权。"""
+    基金名称或实体名称: Optional[str] = None
+    结构类型: Optional[str] = None               # OFC / LPF / REIT / 信托 / 有限合伙
+    是否获证监会认可: Optional[str] = None        # 是 / 否 / 不适用
+    管理公司: Optional[str] = None
+    投资者类型: Optional[str] = None             # 专业 / 零售
+    受益所有人: Optional[str] = None
+    募资规模港币万: Optional[float] = None
+    KYC状态: Optional[str] = None
+
+
 _SCHEMAS = {
     Vertical.insurance_hk: InsuranceHKApplication,
     Vertical.family_office: FamilyOfficeProfile,
+    Vertical.banking_mortgage: BankingMortgageApplication,
+    Vertical.securities_suitability: SecuritiesSuitabilityProfile,
+    Vertical.mpf: MPFProfile,
+    Vertical.fund_ofc_lpf: FundOFCLPFProfile,
 }
 
 
