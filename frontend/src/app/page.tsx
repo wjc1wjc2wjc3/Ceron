@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import { I18nProvider, LanguageSwitcher, useT } from "./i18n";
 
 type DecisionAction = "approve" | "manual_review" | "reject";
 
@@ -39,11 +40,6 @@ const ACTION_COLOR: Record<DecisionAction, "success" | "warning" | "error"> = {
   manual_review: "warning",
   reject: "error",
 };
-const ACTION_LABEL: Record<DecisionAction, string> = {
-  approve: "通过",
-  manual_review: "人工复核",
-  reject: "驳回",
-};
 const STATUS_COLOR: Record<string, any> = {
   queued: "default",
   processing: "info",
@@ -51,7 +47,22 @@ const STATUS_COLOR: Record<string, any> = {
   failed: "error",
 };
 
+function actionLabel(t: (k: string) => string, action: string): string {
+  if (action === "approve") return t("approve");
+  if (action === "rejected") return t("reject");
+  return t("manual_review");
+}
+
 export default function Home() {
+  return (
+    <I18nProvider>
+      <Dashboard />
+    </I18nProvider>
+  );
+}
+
+function Dashboard() {
+  const { t } = useT();
   const [health, setHealth] = useState<any>(null);
   const [vertical, setVertical] = useState("insurance_hk");
   const [text, setText] = useState(SAMPLES.insurance_hk);
@@ -162,11 +173,13 @@ export default function Home() {
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-        <Typography variant="h4">Ceron 控制台</Typography>
+        <Typography variant="h4">{t("appTitle")}</Typography>
         <Chip
-          label={`网关：${health?.status ?? "…"}`}
+          label={`${t("gateway")}：${health?.status ?? "…"}`}
           color={health?.status === "ok" ? "success" : "default"}
         />
+        <Box sx={{ flexGrow: 1 }} />
+        <LanguageSwitcher />
       </Stack>
 
       <Grid container spacing={2}>
@@ -174,21 +187,21 @@ export default function Home() {
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
-              文档提交
+              {t("submitTitle")}
             </Typography>
             <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>垂直场景</InputLabel>
+              <InputLabel>{t("vertical")}</InputLabel>
               <Select
-                label="垂直场景"
+                label={t("vertical")}
                 value={vertical}
                 onChange={(e) => setVertical(e.target.value)}
               >
-                <MenuItem value="insurance_hk">港股保险 / 承保理赔</MenuItem>
-                <MenuItem value="family_office">家族办公室 KYC</MenuItem>
+                <MenuItem value="insurance_hk">{t("v.insurance_hk")}</MenuItem>
+                <MenuItem value="family_office">{t("v.family_office")}</MenuItem>
               </Select>
             </FormControl>
             <TextField
-              label="文档文本"
+              label={t("docText")}
               value={text}
               onChange={(e) => setText(e.target.value)}
               multiline
@@ -198,16 +211,16 @@ export default function Home() {
             />
             <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
               <Button size="small" onClick={() => setText(SAMPLES[vertical])}>
-                载入示例
+                {t("loadSample")}
               </Button>
             </Stack>
             <FormControlLabel
               control={<Checkbox checked={asyncMode} onChange={(e) => setAsyncMode(e.target.checked)} />}
-              label="异步提交（看板轮询）"
+              label={t("asyncMode")}
             />
             <Box>
               <Button variant="contained" onClick={submit}>
-                提交并编排
+                {t("submit")}
               </Button>
             </Box>
           </Paper>
@@ -216,50 +229,50 @@ export default function Home() {
         {/* 右：审批看板 */}
         <Grid item xs={12} md={7}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-            <Typography variant="h6">作业看板</Typography>
+            <Typography variant="h6">{t("kanban")}</Typography>
             <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>状态筛选</InputLabel>
+              <InputLabel>{t("statusFilter")}</InputLabel>
               <Select
-                label="状态筛选"
+                label={t("statusFilter")}
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setPage(0);
                 }}
               >
-                <MenuItem value="">全部</MenuItem>
-                <MenuItem value="queued">queued</MenuItem>
-                <MenuItem value="processing">processing</MenuItem>
-                <MenuItem value="completed">completed</MenuItem>
-                <MenuItem value="failed">failed</MenuItem>
+                <MenuItem value="">{t("status.all")}</MenuItem>
+                <MenuItem value="queued">{t("status.queued")}</MenuItem>
+                <MenuItem value="processing">{t("status.processing")}</MenuItem>
+                <MenuItem value="completed">{t("status.completed")}</MenuItem>
+                <MenuItem value="failed">{t("status.failed")}</MenuItem>
               </Select>
             </FormControl>
             <Button size="small" onClick={() => loadJobs()}>
-              刷新
+              {t("refresh")}
             </Button>
           </Stack>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              共 {total} 条
+              {t("total").replace("{n}", String(total))}
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
               <Button size="small" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                上一页
+                {t("prev")}
               </Button>
-              <Typography variant="caption">第 {page + 1} 页</Typography>
+              <Typography variant="caption">{t("page").replace("{n}", String(page + 1))}</Typography>
               <Button
                 size="small"
                 disabled={(page + 1) * PAGE_SIZE >= total}
                 onClick={() => setPage((p) => p + 1)}
               >
-                下一页
+                {t("next")}
               </Button>
             </Stack>
           </Stack>
           <Grid container spacing={1}>
             {jobs.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                暂无作业，提交后在此显示。
+                {t("empty")}
               </Typography>
             )}
             {jobs.map((j) => (
@@ -281,7 +294,7 @@ export default function Home() {
                       {j.result?.decision?.action && (
                         <Chip
                           size="small"
-                          label={ACTION_LABEL[j.result.decision.action as DecisionAction]}
+                          label={actionLabel(t, j.result.decision.action)}
                           color={ACTION_COLOR[j.result.decision.action as DecisionAction]}
                         />
                       )}
@@ -289,7 +302,7 @@ export default function Home() {
                         <Chip
                           size="small"
                           icon={j.review_status === "approved" ? <CheckCircleIcon /> : <CancelIcon />}
-                          label={j.review_status === "approved" ? "已通过" : "已驳回"}
+                          label={j.review_status === "approved" ? t("approved") : t("rejected")}
                           color={j.review_status === "approved" ? "success" : "error"}
                         />
                       )}
@@ -306,12 +319,14 @@ export default function Home() {
       {sel && (
         <Paper sx={{ p: 2, mt: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">处理结果 · {sel.id}</Typography>
+            <Typography variant="h6">
+              {t("resultTitle")} · {sel.id}
+            </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
               <TextField
                 size="small"
-                label="审批人"
-                placeholder="manual"
+                label={t("reviewer")}
+                placeholder={t("manual")}
                 value={reviewer}
                 onChange={(e) => setReviewer(e.target.value)}
                 sx={{ width: 140 }}
@@ -324,7 +339,7 @@ export default function Home() {
                 onClick={() => applyReview(sel.id, "approved")}
                 disabled={!!sel.review_status}
               >
-                人工通过
+                {t("manualApprove")}
               </Button>
               <Button
                 size="small"
@@ -334,26 +349,30 @@ export default function Home() {
                 onClick={() => applyReview(sel.id, "rejected")}
                 disabled={!!sel.review_status}
               >
-                人工驳回
+                {t("manualReject")}
               </Button>
             </Stack>
           </Stack>
           {sel.review_status && (
             <Typography variant="caption" color="text.secondary">
-              审批结论：{sel.review_status === "approved" ? "已通过" : "已驳回"} · 审批人：
-              {sel.reviewed_by || "manual"}
-              {sel.reviewed_at ? ` · 时间：${new Date(sel.reviewed_at).toLocaleString()}` : ""}
+              {t("reviewConclusion")
+                .replace("{status}", sel.review_status === "approved" ? t("approved") : t("rejected"))
+                .replace("{by}", sel.reviewed_by || t("manual"))
+                .replace(
+                  "{at}",
+                  sel.reviewed_at ? ` · ${t("timePrefix")}${new Date(sel.reviewed_at).toLocaleString()}` : ""
+                )}
             </Typography>
           )}
 
           {!sel.result ? (
             <Typography sx={{ mt: 1 }} color="text.secondary">
-              处理中（异步作业轮询中）…
+              {t("processing")}
             </Typography>
           ) : (
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2">抽取字段</Typography>
+                <Typography variant="subtitle2">{t("extracted")}</Typography>
                 <Table size="small">
                   <TableBody>
                     {Object.entries(extracted).map(([k, v]) => (
@@ -366,28 +385,39 @@ export default function Home() {
                 </Table>
               </Grid>
               <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2">富集结果</Typography>
+                <Typography variant="subtitle2">{t("enrichment")}</Typography>
                 <Stack spacing={0.5} sx={{ mb: 1 }}>
-                  <Typography variant="body2">数据源：{enrichment?.provider ?? "-"}</Typography>
                   <Typography variant="body2">
-                    ICRIS 核验：{enrichment?.icris_verified ? "是" : "否"} · 制裁命中：
-                    {enrichment?.sanctions_hit ? "是" : "否"} · 风险：{enrichment?.risk_from_enrich || "-"}
+                    {t("dataSource")}
+                    {enrichment?.provider ?? "-"}
+                  </Typography>
+                  <Typography variant="body2">
+                    {t("icris")}
+                    {enrichment?.icris_verified ? t("yes") : t("no")} · {t("sanctions")}
+                    {enrichment?.sanctions_hit ? t("yes") : t("no")} · {t("risk")}
+                    {enrichment?.risk_from_enrich || "-"}
                   </Typography>
                   {(enrichment?.flags || []).map((f: string, i: number) => (
                     <Chip key={i} size="small" color="warning" label={f} sx={{ alignSelf: "flex-start" }} />
                   ))}
                 </Stack>
                 <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2">决策建议</Typography>
+                <Typography variant="subtitle2">{t("decision")}</Typography>
                 {decision && (
                   <Stack spacing={0.5}>
                     <Chip
                       size="small"
-                      label={ACTION_LABEL[decision.action as DecisionAction] || decision.action}
+                      label={actionLabel(t, decision.action) || decision.action}
                       color={ACTION_COLOR[decision.action as DecisionAction] || "default"}
                     />
-                    <Typography variant="body2">理由：{decision.reason}</Typography>
-                    <Typography variant="body2">风险等级：{decision.risk_level}</Typography>
+                    <Typography variant="body2">
+                      {t("reason")}
+                      {decision.reason}
+                    </Typography>
+                    <Typography variant="body2">
+                      {t("riskLevel")}
+                      {decision.risk_level}
+                    </Typography>
                   </Stack>
                 )}
               </Grid>
