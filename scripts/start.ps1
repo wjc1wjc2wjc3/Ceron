@@ -20,6 +20,13 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
 $Procs = @()
 
+function Test-Health($url) {
+  try { (Invoke-RestMethod -Uri $url -TimeoutSec 1).status } catch { $null }
+}
+function Test-Port($port) {
+  try { [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) } catch { $false }
+}
+
 function Stop-All {
   Write-Host "`n[ceron] stopping all services..." -ForegroundColor Yellow
   foreach ($p in $Procs) {
@@ -34,6 +41,9 @@ try { [Console]::TreatControlCAsInput = $false } catch {}
 
 # --- 1. Python intelligence layer (non-fatal: do not block go/frontend) ---
 Write-Host "[ceron] starting python-svc :$PyPort ..." -ForegroundColor Cyan
+if (Test-Port $PyPort) {
+  Write-Host "[ceron] :$PyPort already in use - python-svc assumed running (skip)" -ForegroundColor DarkCyan
+} else {
 try {
   $venv = Join-Path $PyDir ".venv"
   if (-not (Test-Path $venv)) {
@@ -56,9 +66,13 @@ try {
 } catch {
   Write-Host "[ceron] WARNING: python-svc not started: $_" -ForegroundColor Yellow
 }
+}
 
 # --- 2. Go gateway (build once, then run the binary so the recorded PID is the server) ---
 Write-Host "[ceron] starting go-svc :$GoPort ..." -ForegroundColor Cyan
+if (Test-Port $GoPort) {
+  Write-Host "[ceron] :$GoPort already in use - go-svc assumed running (skip)" -ForegroundColor DarkCyan
+} else {
 try {
   $goBin = Join-Path $env:TEMP "ceron-gateway.exe"
   Push-Location $GoDir
@@ -74,6 +88,7 @@ try {
   $Procs += $g
 } catch {
   Write-Host "[ceron] WARNING: go-svc not started: $_" -ForegroundColor Yellow
+}
 }
 
 # --- 3. Frontend ---
@@ -91,23 +106,32 @@ $Procs += $f
 # Persist PIDs for external stop.bat
 $Procs | ForEach-Object { $_.Id } | Where-Object { $_ -ne 0 } | Out-File -Encoding ascii (Join-Path $LogDir ".pids")
 
-function Test-Health($url) {
-  try { (Invoke-RestMethod -Uri $url -TimeoutSec 1).status } catch { $null }
-}
 Write-Host "[ceron] waiting for services..." -ForegroundColor Cyan
-$pyOk = $false; $goOk = $false
+$pyOk = Test-Port $PyPort; $goOk = Test-Port $GoPort
 for ($i = 0; $i -lt 30; $i++) {
   if (-not $pyOk) { $r = Test-Health "http://localhost:$PyPort/health"; if ($r) { $pyOk = $true; Write-Host "  OK python-svc" -ForegroundColor Green } }
   if (-not $goOk) { $r = Test-Health "http://localhost:$GoPort/health"; if ($r) { $goOk = $true; Write-Host "  OK go-svc" -ForegroundColor Green } }
   if ($pyOk -and $goOk) { break }
   Start-Sleep -Seconds 1
 }
+# --- 4. Wait for frontend readiness (first Next.js compile may take tens of seconds) ---
+Write-Host "[ceron] waiting for frontend (first compile may take ~30s)..." -ForegroundColor Cyan
+$feOk = $false
+for ($i = 0; $i -lt 90; $i++) {
+  try {
+    $resp = Invoke-WebRequest "http://localhost:$FePort" -TimeoutSec 2 -UseBasicParsing
+    if ($resp.StatusCode -eq 200) { $feOk = $true; break }
+  } catch {}
+  Start-Sleep -Seconds 1
+}
+if ($feOk) { Write-Host "  OK frontend" -ForegroundColor Green }
+else { Write-Host "  WARN frontend not ready after 90s (check logs\fe.log / logs\fe.err)" -ForegroundColor Yellow }
+
 Write-Host ""
-Write-Host "[ceron] all started. Frontend http://localhost:$FePort   (Ctrl+C to stop)" -ForegroundColor Green
+Write-Host "[ceron] all started. Frontend http://localhost:$FePort   (Ctrl+C or scripts\stop.bat to stop)" -ForegroundColor Green
 Write-Host "[ceron]   logs: $LogDir" -ForegroundColor DarkGray
 
-if (-not $NoBrowser) {
-  Start-Sleep -Seconds 3
+if (-not $NoBrowser -and $feOk) {
   try { Start-Process "http://localhost:$FePort" } catch {}
 }
 
