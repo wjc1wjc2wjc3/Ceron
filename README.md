@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-pytest%2048%20pass-brightgreen)
+![Tests](https://img.shields.io/badge/tests-pytest%2072%20pass-brightgreen)
 
 > **English**: Ceron is an underwriting & compliance automation platform for Hong Kong financial institutions (insurance, trusts, family offices) — multi-channel intake (API / WhatsApp / WeCom), bilingual document extraction, pluggable data enrichment (ICRIS / Land Search / credit bureau / OFAC / HMT / CRS), decisioning with SFC/HKMA/MPFA compliance gates, ongoing monitoring, SAR filing and regulatory MI reporting.
 
@@ -105,6 +105,28 @@ AUTH_SECRET=change-me-in-production
 
 > 提示：未拿到 X / Facebook 应用审批前，可先用邮箱注册（`http://localhost:3000/register`）
 > 完整体验控制台；社交登录一旦填入凭证即可自动生效。
+
+## 大模型选择（按用户：内置 5 家 + 自定义模型）
+
+平台用户可在控制台 **AI models（`/app/models`）** 自主选择抽取所用的大模型：
+
+- **内置预设**：DeepSeek、Kimi（Moonshot）、GLM（智谱）、Qwen（通义千问）、Doubao（豆包）。
+  每家都带默认 `base_url` 与默认模型名，且**均可就地改写**（国产模型迭代快，不写死）。
+- **自定义模型**：任意 OpenAI 兼容端点（自建 vLLM / 内部网关 / 新厂商），
+  填 **模型名称 + base_url + api_key** 即可接入，并可关闭 `response_format` JSON 模式
+  （部分模型不支持该参数；即便开启，遇到 400 也会自动降级重试）。
+- **密钥安全**：密钥存服务端，**对外只返回脱敏值**（`sk-ab…9876`）；更新时若回传空值或
+  脱敏值，服务端保留原密钥，避免误清空。
+- **生效范围**：`/v1/pipeline` 自动使用当前登录用户选定的模型；未登录或未选择时
+  回落服务级环境变量（`LLM_PROVIDER=mock` 即零成本运行）。
+
+| 接口 | 说明 |
+|---|---|
+| `GET /v1/llm/presets` | 内置模型目录（无需登录） |
+| `GET/PUT /v1/llm/settings` | 读取 / 保存用户选择（密钥脱敏，需登录） |
+| `POST /v1/llm/custom` | 新增自定义模型 |
+| `DELETE /v1/llm/custom/{id}` | 删除自定义模型 |
+| `POST /v1/llm/test` | 连通性测试：真实发一次极短对话验证模型/地址/密钥 |
 
 ## 数据源真实接入示例（ICRIS / 信贷局）
 

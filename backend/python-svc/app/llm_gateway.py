@@ -8,7 +8,10 @@ from typing import Type
 
 from pydantic import BaseModel
 
+from typing import Optional
+
 from app.llm import LLMClient
+from app.llm_catalog import LLMCfg
 from app.regex_extract import rule_extract
 
 _CLIENT = LLMClient()
@@ -31,9 +34,11 @@ def _backfill_money(cleaned: dict, schema_cls: Type[BaseModel], candidates):
                 cleaned[f] = cands.pop(0)
 
 
-async def extract(text: str, schema_cls: Type[BaseModel]) -> BaseModel:
+async def extract(text: str, schema_cls: Type[BaseModel], cfg: Optional[LLMCfg] = None) -> BaseModel:
+    """抽取结构化字段。传入 cfg 时使用该用户选定的模型，否则走服务级默认客户端。"""
     hint = json.dumps(schema_cls.model_json_schema(), ensure_ascii=False)
-    raw = await _CLIENT.extract(text, hint)
+    client = _CLIENT if cfg is None else LLMClient(cfg)
+    raw = await client.extract(text, hint)
 
     if raw.get("_mock") or not raw:
         raw = rule_extract(text)

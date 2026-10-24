@@ -95,6 +95,11 @@ CREATE TABLE IF NOT EXISTS password_resets (
   expires_at TIMESTAMPTZ NOT NULL,
   consumed   BOOLEAN NOT NULL DEFAULT false
 );
+CREATE TABLE IF NOT EXISTS llm_settings (
+  user_id    TEXT PRIMARY KEY,
+  config     JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -334,6 +339,28 @@ class PostgresBackend:
                         (token_hash,))
         return {"user_id": r[0]}
 
+    # --- 每用户大模型设置 ---
+    def get_llm_config(self, user_id: str):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT config FROM llm_settings WHERE user_id = %s", (user_id,))
+            r = cur.fetchone()
+        return r[0] if r else None
+
+    def set_llm_config(self, user_id: str, config: dict) -> None:
+        from psycopg2.extras import Json
+
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO llm_settings (user_id, config, updated_at)
+                VALUES (%s, %s, now())
+                ON CONFLICT (user_id) DO UPDATE SET config = EXCLUDED.config, updated_at = now()
+                """,
+                (user_id, Json(config)),
+            )
+
     def pending_password_resets(self) -> list[dict]:
         with self._conn() as conn:
             cur = conn.cursor()
@@ -550,6 +577,25 @@ def add_password_reset(rec: dict) -> None:
         return
     with _lock:
         _password_resets.append(rec)
+
+
+# ============ 每用户大模型设置（模型选择 / 自定义模型）============
+_llm_settings: dict[str, dict] = {}
+
+
+def get_llm_config(user_id: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.get_llm_config(user_id)
+    with _lock:
+        return _llm_settings.get(user_id)
+
+
+def set_llm_config(user_id: str, config: dict) -> None:
+    if _pg is not None:
+        _pg.set_llm_config(user_id, config)
+        return
+    with _lock:
+        _llm_settings[user_id] = config
 
 
 def take_password_reset(token_hash: str) -> Optional[dict]:

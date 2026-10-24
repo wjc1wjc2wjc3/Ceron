@@ -8,13 +8,15 @@ Go 编排服务（gateway/orchestrator）通过以下 REST 接口调用本服务
   POST /v1/decision  { vertical, extracted, enrichment }
   POST /v1/pipeline  { vertical, text | image_base64 } # 串联 OCR→抽取→富集→决策
 """
+import json
+import uuid
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from app import auth
+from app import auth, llm, llm_catalog
 from app.compliance import check_data_residency
 from app.config import settings
 from app.decision import assess
@@ -101,7 +103,7 @@ def decision_endpoint(req: DecisionReq):
 
 
 @app.post("/v1/pipeline")
-async def pipeline_endpoint(req: PipelineReq):
+async def pipeline_endpoint(req: PipelineReq, authorization: Optional[str] = Header(None)):
     text = req.text.strip()
     ocr_used = False
     if not text and req.image_base64:
@@ -111,7 +113,12 @@ async def pipeline_endpoint(req: PipelineReq):
     if not text:
         return {"error": "text 或 image_base64 至少提供一项"}
 
-    res = await extract_document(text, req.vertical)
+    # 已登录用户按其选定的模型（内置预设 / 自定义）抽取；未登录则回落到服务级配置
+    cfg = None
+    payload = auth.verify_token(_token_from_header(authorization))
+    if payload:
+        cfg = llm_catalog.resolve(store.get_llm_config(payload.get("sub", "")))
+    res = await extract_document(text, req.vertical, cfg)
     enrichment = enrich(req.vertical.value, res["extracted"], req.locale)
     decision = assess(req.vertical, res["extracted"], enrichment, req.locale)
     # 优先级 3：记录决策历史（供 MI）并登记实体（供持续监控）
@@ -285,6 +292,160 @@ def auth_password_forgot(req: ForgotReq):
     if echo:
         body["dev_link"] = echo
     return body
+
+
+# ============ 大模型（LLM）设置：用户自主选择 / 自定义模型 ============
+
+class LlmSettingsReq(BaseModel):
+    active: str = ""
+    providers: dict = {}
+    customs: list = []
+
+
+class LlmCustomReq(BaseModel):
+    name: str
+    model: str
+    base_url: str
+    api_key: str = ""
+    json_mode: bool = True
+
+
+class LlmTestReq(BaseModel):
+    provider: str = ""          # 内置预设 id
+    custom_id: str = ""         # 自定义模型 id
+    base_url: str = ""
+    model: str = ""
+    api_key: str = ""
+
+
+def _current_user(authorization: Optional[str]) -> dict:
+    """解析当前登录用户（模型设置属于用户私有数据，必须鉴权）。"""
+    payload = auth.verify_token(_token_from_header(authorization))
+    if not payload:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    user = store.get_user_by_id(payload.get("sub", ""))
+    if not user:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return user
+
+
+def _save_llm(user_id: str, incoming: dict) -> dict:
+    """保存设置；空/脱敏密钥保留服务端原值，避免误清空。"""
+    old = store.get_llm_config(user_id) or llm_catalog.empty_config()
+    providers = dict(old.get("providers") or {})
+    for pid, over in (incoming.get("providers") or {}).items():
+        cur = dict(providers.get(pid) or {})
+        for k in ("base_url", "model"):
+            if over.get(k):
+                cur[k] = over[k]
+        if not llm_catalog.is_masked(over.get("api_key")):
+            cur["api_key"] = over["api_key"]
+        providers[pid] = cur
+
+    old_customs = {c.get("id"): dict(c) for c in (old.get("customs") or [])}
+    for c in incoming.get("customs") or []:
+        cid = c.get("id")
+        if not cid or cid not in old_customs:
+            continue
+        cur = old_customs[cid]
+        for k in ("name", "model", "base_url"):
+            if c.get(k):
+                cur[k] = c[k]
+        cur["json_mode"] = bool(c.get("json_mode", True))
+        if not llm_catalog.is_masked(c.get("api_key")):
+            cur["api_key"] = c.get("api_key", "")
+
+    cfg = {
+        "active": incoming.get("active", old.get("active", "")),
+        "providers": providers,
+        "customs": list(old_customs.values()),
+    }
+    store.set_llm_config(user_id, cfg)
+    return cfg
+
+
+@app.get("/v1/llm/presets")
+def llm_presets():
+    """内置模型目录 + 自定义入口（无需登录，便于前端渲染选择卡片）。"""
+    return {
+        "presets": llm_catalog.PRESETS,
+        "custom": {"id": llm_catalog.CUSTOM, "label": "Custom model (OpenAI-compatible)"},
+    }
+
+
+@app.get("/v1/llm/settings")
+def llm_get_settings(authorization: Optional[str] = Header(None)):
+    user = _current_user(authorization)
+    cfg = store.get_llm_config(user["id"])
+    return {"settings": llm_catalog.public_view(cfg)}
+
+
+@app.put("/v1/llm/settings")
+def llm_put_settings(req: LlmSettingsReq, authorization: Optional[str] = Header(None)):
+    user = _current_user(authorization)
+    active = req.active
+    known = llm_catalog.PRESET_IDS | {
+        c.get("id") for c in (store.get_llm_config(user["id"]) or {}).get("customs", [])
+    }
+    if active and active not in known:
+        raise HTTPException(status_code=400, detail="unknown_provider")
+    cfg = _save_llm(user["id"], req.model_dump())
+    return {"settings": llm_catalog.public_view(cfg)}
+
+
+@app.post("/v1/llm/custom")
+def llm_add_custom(req: LlmCustomReq, authorization: Optional[str] = Header(None)):
+    """新增自定义模型（OpenAI 兼容：名称 + base_url + api_key + 模型名）。"""
+    user = _current_user(authorization)
+    if not req.base_url.strip() or not req.model.strip():
+        raise HTTPException(status_code=400, detail="base_url_and_model_required")
+    cfg = store.get_llm_config(user["id"]) or llm_catalog.empty_config()
+    customs = cfg.get("customs") or []
+    item = {
+        "id": f"cm-{uuid.uuid4().hex[:10]}",
+        "name": req.name or req.model,
+        "model": req.model,
+        "base_url": req.base_url.rstrip("/"),
+        "api_key": req.api_key,
+        "json_mode": bool(req.json_mode),
+    }
+    customs.append(item)
+    cfg["customs"] = customs
+    cfg["active"] = cfg.get("active") or item["id"]  # 首个自定义模型默认启用
+    store.set_llm_config(user["id"], cfg)
+    return {"custom": llm_catalog.public_view(cfg)["customs"][-1]}
+
+
+@app.delete("/v1/llm/custom/{custom_id}")
+def llm_delete_custom(custom_id: str, authorization: Optional[str] = Header(None)):
+    user = _current_user(authorization)
+    cfg = store.get_llm_config(user["id"]) or llm_catalog.empty_config()
+    cfg["customs"] = [c for c in (cfg.get("customs") or []) if c.get("id") != custom_id]
+    if cfg.get("active") == custom_id:
+        cfg["active"] = ""
+    store.set_llm_config(user["id"], cfg)
+    return {"ok": True}
+
+
+@app.post("/v1/llm/test")
+async def llm_test(req: LlmTestReq, authorization: Optional[str] = Header(None)):
+    """连通性测试：真实发一次极短对话，验证 base_url / 模型 / 密钥是否正确。"""
+    _current_user(authorization)
+    cfg = llm_catalog.resolve({
+        "active": req.custom_id or req.provider,
+        "customs": ([{"id": req.custom_id, "base_url": req.base_url, "model": req.model,
+                      "api_key": req.api_key, "json_mode": True}] if req.custom_id else []),
+        "providers": ({req.provider: {"base_url": req.base_url, "model": req.model,
+                                      "api_key": req.api_key}} if req.provider else {}),
+    })
+    if not cfg.usable():
+        return {"ok": False, "error": "missing_base_url_model_or_key"}
+    try:
+        client = llm.LLMClient(cfg)
+        await client.extract("ping", json.dumps({"ping": "string"}, ensure_ascii=False))
+        return {"ok": True, "provider": cfg.provider, "model": cfg.model}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:300]}
 
 
 @app.post("/v1/auth/password/reset")
