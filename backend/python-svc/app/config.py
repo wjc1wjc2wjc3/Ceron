@@ -30,6 +30,9 @@ class Settings:
     enrichment_provider: str = os.getenv("ENRICHMENT_PROVIDER", "mock")
     icris_api_url: str = os.getenv("ICRIS_API_URL", "")
     icris_api_key: str = os.getenv("ICRIS_API_KEY", "")
+    # ICRIS 会话态鉴权（e-Services / 持牌数据服务商）：登录换 token 后以 Bearer 查询
+    icris_auth_url: str = os.getenv("ICRIS_AUTH_URL", "")
+    icris_account: str = os.getenv("ICRIS_ACCOUNT", "")
     sanctions_api_url: str = os.getenv("SANCTIONS_API_URL", "")
     sanctions_api_key: str = os.getenv("SANCTIONS_API_KEY", "")
     # 优先级 1 新增数据源（配置对应 API_URL 即启用，失败自动降级人工复核）
@@ -37,6 +40,8 @@ class Settings:
     land_search_api_key: str = os.getenv("LAND_SEARCH_API_KEY", "")
     credit_bureau_api_url: str = os.getenv("CREDIT_BUREAU_API_URL", "")
     credit_bureau_api_key: str = os.getenv("CREDIT_BUREAU_API_KEY", "")
+    # 信贷局会员鉴权（TransUnion HK 等以会员编号 + API Key 调用）
+    credit_bureau_member_id: str = os.getenv("CREDIT_BUREAU_MEMBER_ID", "")
     ofac_api_url: str = os.getenv("OFAC_API_URL", "")
     ofac_api_key: str = os.getenv("OFAC_API_KEY", "")
     hmt_api_url: str = os.getenv("HMT_API_URL", "")

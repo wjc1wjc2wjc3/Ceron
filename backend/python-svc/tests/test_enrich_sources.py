@@ -125,3 +125,85 @@ def test_decision_credit_adverse_signal():
     )
     assert d["risk_score"] >= 30
     assert any("信貸局" in r for r in d["reasons"])
+
+
+def test_icris_session_auth_and_get(monkeypatch):
+    """会话态：先 POST 登录换 token，再以 Bearer GET 查询。"""
+    _set(monkeypatch, icris_api_url="http://icris/search", icris_auth_url="http://icris/login",
+         icris_account="acme", icris_api_key="k")
+
+    calls = {}
+
+    def fake_post(url, **kw):
+        class _R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"access_token": "TOK"} if "login" in url else {}
+        calls["post"] = url
+        return _R()
+
+    def fake_get(url, **kw):
+        class _R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"verified": True, "company_status": "Live", "cr_no": "1234567"}
+        calls["get"] = url
+        calls["headers"] = kw.get("headers", {})
+        return _R()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(httpx, "get", fake_get)
+    r = E.enrich("family_office", {"客户姓名或实体名称": "陳大文家族辦公室有限公司"})
+    assert r["icris_verified"] is True
+    assert r["icris_company_status"] == "Live"
+    assert r["icris_cr_no"] == "1234567"
+    assert calls["get"] == "http://icris/search"
+    assert calls["headers"].get("Authorization") == "Bearer TOK"
+
+
+def test_icris_dissolved_flags_high(monkeypatch):
+    _set(monkeypatch, icris_api_url="http://icris/search")
+
+    class _R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"verified": True, "company_status": "Dissolved"}
+
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _R())
+    r = E.enrich("family_office", {"客户姓名或实体名称": "空殼有限公司"})
+    assert r["risk_from_enrich"] == "high"
+    assert any("解散" in f for f in r["flags"])
+
+
+def test_credit_bureau_member_header(monkeypatch):
+    """信贷局：请求头须透传会员编号与 API Key。"""
+    _set(monkeypatch, credit_bureau_api_url="http://tu/report",
+         credit_bureau_api_key="k", credit_bureau_member_id="MEM-1")
+
+    captured = {}
+
+    def fake_post(url, **kw):
+        captured["headers"] = kw.get("headers", {})
+        captured["json"] = kw.get("json", {})
+
+        class _R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"score": 580, "adverse": True}
+        return _R()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    r = E.enrich("banking_mortgage", {"申请人": "李四", "HKID": "A123456(7)"})
+    assert captured["headers"].get("X-Member-Id") == "MEM-1"
+    assert captured["headers"].get("Authorization") == "Bearer k"
+    assert captured["json"]["hkid"] == "A123456(7)"
+    assert r["credit_adverse"] is True
+    assert r["credit_score"] == 580

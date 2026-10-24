@@ -36,6 +36,24 @@ def _post(api_url: str, api_key: str, payload: dict, timeout: float = 15.0) -> d
     return resp.json()
 
 
+def _get(api_url: str, api_key: str, params: dict | None = None, token: str | None = None,
+         timeout: float = 15.0) -> dict:
+    headers = _auth_headers(api_key)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    resp = httpx.get(api_url, params=params, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _login(auth_url: str, account: str, api_key: str, timeout: float = 15.0) -> str | None:
+    """向数据源鉴权端点换取会话令牌（ICRIS 等需登录态的服务）。"""
+    resp = httpx.post(auth_url, json={"account": account, "api_key": api_key}, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("access_token") or data.get("token")
+
+
 def _base_result(extracted: dict, locale: str = "zh-HK") -> dict:
     """所有 Provider 共用的基线结果（基于抽取字段的本地规则）。"""
     flags: list[str] = []
@@ -87,7 +105,8 @@ def _merge(result: dict, r: dict) -> None:
               "credit_adverse", "land_unresolved", "crs_issue", "land_verified"):
         if r.get(k):
             result[k] = True
-    for k in ("sanctions_lists", "icris_company_status", "land_charges",
+    for k in ("sanctions_lists", "icris_company_status", "icris_br_status",
+              "icris_cr_no", "land_charges",
               "credit_score", "tax_residency", "fatca_status"):
         if r.get(k) is not None:
             result[k] = r[k]
@@ -101,31 +120,72 @@ class MockProvider:
 
 
 class IcrisProvider:
-    """香港公司註冊處 ICRIS 查冊适配器。
+    """香港公司註冊處 ICRIS 查冊适配器（真实接入）。
 
-    约定接口：POST {company_name} → {"verified": bool, "company_status": str}
-    （真实接入需政府「大量查冊」核准与凭证；也可对接持牌数据服务商。）
+    支持两种接入形态：
+    1. 会话态（推荐，需 ICRIS_AUTH_URL）：先向鉴权端点换 token，再以 Bearer
+       令牌 GET 查询（兼容 ICRIS e-Services / 持牌数据服务商的 JSON 契约）。
+    2. 直连态：按既有契约 POST 查询（与旧版 mock/占位行为一致）。
+
+    密钥来自 .env：ICRIS_API_URL / ICRIS_API_KEY / ICRIS_AUTH_URL / ICRIS_ACCOUNT。
+    仅当 ICRIS_API_URL 配置时才会真正外呼；未配置退化为离线演示（verified=True）。
+    调用失败一律降级并打「需人工複核」标记，流水线不中断。
     """
 
     name = "icris"
 
-    def __init__(self, api_url: str, api_key: str) -> None:
+    def __init__(self, api_url: str, api_key: str = "", auth_url: str = "",
+                 account: str = "") -> None:
         self.api_url = api_url
         self.api_key = api_key
+        self.auth_url = auth_url
+        self.account = account
 
     def enrich(self, vertical: str, extracted: dict, locale: str = "zh-HK") -> dict:
         r = {"flags": [], "risk_from_enrich": "normal", "icris_verified": False}
-        name = extracted.get("客户姓名或实体名称") or extracted.get("投保人") or ""
-        if not name:
+        name = (
+            extracted.get("客户姓名或实体名称")
+            or extracted.get("投保人")
+            or extracted.get("公司名称")
+            or ""
+        )
+        cr_no = (
+            extracted.get("公司编号") or extracted.get("CR No") or extracted.get("CR號碼") or ""
+        )
+        if not name and not cr_no:
             return r
         if not self.api_url:
-            r["icris_verified"] = True
+            r["icris_verified"] = True  # 离线演示
             return r
         try:
-            data = _post(self.api_url, self.api_key, {"company_name": name})
+            token = None
+            if self.auth_url:
+                token = _login(self.auth_url, self.account, self.api_key)
+            params = {}
+            if cr_no:
+                params["cr_no"] = cr_no
+            else:
+                params["name"] = name
+            if token:
+                data = _get(self.api_url, "", params=params, token=token)
+            else:
+                body = {"company_name": name} if name else {"cr_no": cr_no}
+                data = _post(self.api_url, self.api_key, body)
             r["icris_verified"] = bool(data.get("verified"))
             if data.get("company_status"):
                 r["icris_company_status"] = data["company_status"]
+            if data.get("br_status"):
+                r["icris_br_status"] = data["br_status"]
+            r["icris_cr_no"] = data.get("cr_no") or cr_no
+            if data.get("dissolved") or data.get("company_status") in (
+                "Dissolved", "Deregistered", "已解散", "已撤銷註冊"
+            ):
+                r["risk_from_enrich"] = "high"
+                r["flags"].append(
+                    tr(locale, "ICRIS：公司已解散／撤銷註冊，需核查。",
+                       "ICRIS: company dissolved / deregistered; verification required.",
+                       "ICRIS：公司已解散／撤销注册，需核查。")
+                )
         except Exception:
             r["risk_from_enrich"] = "high"
             r["flags"].append(
@@ -226,13 +286,21 @@ class LandRegistryProvider:
 
 
 class CreditBureauProvider:
-    """信贷局（TransUnion HK 等）适配器（信用评分 / 不利纪录）。"""
+    """信贷局（TransUnion HK 等会员机构）适配器（信用评分 / 不利纪录）。
+
+    真实接入：以会员编号（X-Member-Id）+ API Key 调用信贷局信用报告接口
+    （多数为相互 TLS + 会员鉴权；此处以 HTTP Header 透传会员标识与密钥）。
+    密钥来自 .env：CREDIT_BUREAU_API_URL / CREDIT_BUREAU_API_KEY / CREDIT_BUREAU_MEMBER_ID。
+    未配置 CREDIT_BUREAU_API_URL 时退化为离线演示（credit_score=720）。
+    调用失败一律降级并打「需人工複核」标记。
+    """
 
     name = "credit_bureau"
 
-    def __init__(self, api_url: str, api_key: str) -> None:
+    def __init__(self, api_url: str, api_key: str = "", member_id: str = "") -> None:
         self.api_url = api_url
         self.api_key = api_key
+        self.member_id = member_id
 
     def enrich(self, vertical: str, extracted: dict, locale: str = "zh-HK") -> dict:
         r = {"flags": [], "risk_from_enrich": "normal", "credit_adverse": False}
@@ -242,15 +310,26 @@ class CreditBureauProvider:
             or extracted.get("投保人")
             or ""
         )
+        hkid = extracted.get("香港身份證") or extracted.get("HKID") or ""
         if not name:
             return r
         if not self.api_url:
-            r["credit_score"] = 720
+            r["credit_score"] = 720  # 离线演示
             return r
         try:
-            data = _post(self.api_url, self.api_key, {"name": name})
+            headers = _auth_headers(self.api_key)
+            if self.member_id:
+                headers["X-Member-Id"] = self.member_id
+            resp = httpx.post(
+                self.api_url,
+                json={"name": name, "hkid": hkid},
+                headers=headers,
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
             r["credit_score"] = data.get("score")
-            if data.get("adverse"):
+            if data.get("adverse") or data.get("adverse_records"):
                 r["credit_adverse"] = True
                 r["risk_from_enrich"] = "high"
                 r["flags"].append(
@@ -418,7 +497,10 @@ class CrsProvider:
 def get_enrich_provider() -> EnrichProvider:
     name = settings.enrichment_provider
     if name == "icris" and settings.icris_api_url:
-        return IcrisProvider(settings.icris_api_url, settings.icris_api_key)
+        return IcrisProvider(
+            settings.icris_api_url, settings.icris_api_key,
+            settings.icris_auth_url, settings.icris_account,
+        )
     if name == "sanctions" and settings.sanctions_api_url:
         return SanctionsProvider(settings.sanctions_api_url, settings.sanctions_api_key)
     return MockProvider()
@@ -428,13 +510,19 @@ def get_configured_providers() -> list:
     """按 .env 中已配置的 API_URL 实例化全部启用的 Provider。"""
     provs: list = []
     if settings.icris_api_url:
-        provs.append(IcrisProvider(settings.icris_api_url, settings.icris_api_key))
+        provs.append(IcrisProvider(
+            settings.icris_api_url, settings.icris_api_key,
+            settings.icris_auth_url, settings.icris_account,
+        ))
     if settings.sanctions_api_url:
         provs.append(SanctionsProvider(settings.sanctions_api_url, settings.sanctions_api_key))
     if settings.land_search_api_url:
         provs.append(LandRegistryProvider(settings.land_search_api_url, settings.land_search_api_key))
     if settings.credit_bureau_api_url:
-        provs.append(CreditBureauProvider(settings.credit_bureau_api_url, settings.credit_bureau_api_key))
+        provs.append(CreditBureauProvider(
+            settings.credit_bureau_api_url, settings.credit_bureau_api_key,
+            settings.credit_bureau_member_id,
+        ))
     if settings.ofac_api_url:
         provs.append(OfacProvider(settings.ofac_api_url, settings.ofac_api_key))
     if settings.hmt_api_url:

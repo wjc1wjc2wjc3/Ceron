@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 560" font-family="'Segoe UI', 'PingFang HK', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#5b6b7b"/>
+    </marker>
+    <linearGradient id="hd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1565c0"/><stop offset="1" stop-color="#0d47a1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1040" height="560" fill="#f7fafd"/>
+  <text x="40" y="40" font-size="22" font-weight="700" fill="#0d47a1">Ceron 平台架构 · 香港金融业承保与合规自动化</text>
+  <text x="40" y="62" font-size="13" fill="#5b6b7b">前后端分层 · 按职责选语言 · 数据驻留香港区（PDPO）</text>
+
+  <!-- ============ Frontend (left) ============ -->
+  <rect x="40" y="90" width="250" height="100" rx="12" fill="#e3f2fd" stroke="#1565c0" stroke-width="1.5"/>
+  <text x="60" y="120" font-size="15" font-weight="700" fill="#0d47a1">前端控制台</text>
+  <text x="60" y="142" font-size="12" fill="#37474f">Next.js 14 · MUI · i18n（zh-HK / en / zh-CN）</text>
+  <text x="60" y="162" font-size="12" fill="#37474f">工作台 · 合规运营 · 产品能力</text>
+
+  <rect x="40" y="210" width="250" height="80" rx="12" fill="#e3f2fd" stroke="#1565c0" stroke-width="1.5"/>
+  <text x="60" y="238" font-size="14" font-weight="700" fill="#0d47a1">多入口收件</text>
+  <text x="60" y="260" font-size="12" fill="#37474f">WhatsApp · 企业微信 · API · 客户门户</text>
+
+  <!-- ============ Go gateway (middle top) ============ -->
+  <rect x="350" y="90" width="320" height="120" rx="12" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1.5"/>
+  <text x="370" y="118" font-size="15" font-weight="700" fill="#1b5e20">Go 网关 / 编排层</text>
+  <text x="370" y="140" font-size="12" fill="#37474f">gateway · ingestion · orchestrator</text>
+  <text x="370" y="160" font-size="12" fill="#37474f">connectors（CRM 同步）· 审计 / PDPO 中间件</text>
+  <text x="370" y="182" font-size="12" fill="#37474f">透传 locale，三语文案端到端一致</text>
+
+  <!-- NATS -->
+  <rect x="470" y="222" width="80" height="30" rx="8" fill="#fff3e0" stroke="#ef6c00" stroke-width="1.5"/>
+  <text x="510" y="242" font-size="13" font-weight="700" fill="#e65100" text-anchor="middle">NATS</text>
+
+  <!-- ============ Python intelligence (middle bottom) ============ -->
+  <rect x="350" y="272" width="320" height="190" rx="12" fill="#fff3e0" stroke="#ef6c00" stroke-width="1.5"/>
+  <text x="370" y="300" font-size="15" font-weight="700" fill="#e65100">Python 智能服务层（FastAPI）</text>
+  <text x="370" y="324" font-size="12" fill="#37474f">extract · ocr · enrich · decision</text>
+  <text x="370" y="346" font-size="12" fill="#37474f">8 源富集：ICRIS / 土地 / 信贷局 /</text>
+  <text x="370" y="366" font-size="12" fill="#37474f">OFAC / HMT / CRS（失败自动降级复核）</text>
+  <text x="370" y="390" font-size="12" fill="#37474f">决策引擎：8 业务线 schema + 合规閘口</text>
+  <text x="370" y="412" font-size="12" fill="#37474f">monitoring · sar · mi</text>
+  <text x="370" y="436" font-size="12" fill="#37474f">持续监控 / SAR 申报（JFIU）/ 监管 MI</text>
+
+  <!-- ============ Data sources (right) ============ -->
+  <rect x="720" y="90" width="280" height="370" rx="12" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="1.5"/>
+  <text x="740" y="118" font-size="15" font-weight="700" fill="#6a1b9a">外部数据源 / 集成</text>
+
+  <rect x="740" y="135" width="240" height="42" rx="8" fill="#ffffff" stroke="#ab47bc"/>
+  <text x="752" y="161" font-size="12.5" font-weight="600" fill="#4a148c">ICRIS 公司註冊處查冊</text>
+
+  <rect x="740" y="185" width="240" height="42" rx="8" fill="#ffffff" stroke="#ab47bc"/>
+  <text x="752" y="211" font-size="12.5" font-weight="600" fill="#4a148c">土地註冊處 Land Search</text>
+
+  <rect x="740" y="235" width="240" height="42" rx="8" fill="#ffffff" stroke="#ab47bc"/>
+  <text x="752" y="261" font-size="12.5" font-weight="600" fill="#4a148c">信貸局 TU HK（会员 API）</text>
+
+  <rect x="740" y="285" width="240" height="42" rx="8" fill="#ffffff" stroke="#ab47bc"/>
+  <text x="752" y="311" font-size="12.5" font-weight="600" fill="#4a148c">OFAC / HMT 制裁名单</text>
+
+  <rect x="740" y="335" width="240" height="42" rx="8" fill="#ffffff" stroke="#ab47bc"/>
+  <text x="752" y="361" font-size="12.5" font-weight="600" fill="#4a148c">CRS / FATCA 税务居民交换</text>
+
+  <rect x="740" y="385" width="240" height="42" rx="8" fill="#ede7f6" stroke="#7b1fa2"/>
+  <text x="752" y="411" font-size="12.5" font-weight="600" fill="#4a148c">CRM：Salesforce / Dynamics</text>
+
+  <!-- ============ Arrows ============ -->
+  <!-- frontend -> go -->
+  <line x1="290" y1="140" x2="348" y2="140" stroke="#5b6b7b" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- go -> nats -->
+  <line x1="510" y1="210" x2="510" y2="220" stroke="#5b6b7b" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- nats -> python -->
+  <line x1="510" y1="252" x2="510" y2="270" stroke="#5b6b7b" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- python -> data group -->
+  <line x1="670" y1="360" x2="718" y2="300" stroke="#5b6b7b" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- python -> crm -->
+  <line x1="670" y1="410" x2="718" y2="406" stroke="#5b6b7b" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- loop: data -> python (enriched back) -->
+  <line x1="718" y1="250" x2="672" y2="320" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+
+  <!-- footer note -->
+  <text x="40" y="520" font-size="12" fill="#5b6b7b">部署：docker-compose（默认零依赖内存）· NSSM / launchd / systemd；数据建议驻留 AWS ap-east-1（香港）。</text>
+</svg>
