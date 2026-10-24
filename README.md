@@ -76,6 +76,12 @@ Ceron/
 
 ## 运行方式
 
+> 一键启动（推荐）：仓库内置脚本会自动拉起三个服务并打开前端。
+> - Windows：`scripts\start.bat`（停止用 `scripts\stop.bat`，或启动窗口按任意键）
+> - Windows(PowerShell)：`scripts\start.ps1`
+> - macOS / Linux：`./scripts/start.sh`
+> 脚本会自动创建 Python venv 并安装依赖、按需 `npm install`，日志见 `logs/`。
+
 ### 后端 Python 智能服务层
 ```bash
 cd backend/python-svc
