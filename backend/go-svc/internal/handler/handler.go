@@ -112,16 +112,52 @@ func (s *Server) ListJobs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"jobs": jobs, "count": len(jobs)})
 }
 
-// GetJob 查询作业结果：/v1/jobs/{id}。
+// GetJob 查询作业结果：/v1/jobs/{id}；PATCH /v1/jobs/{id}/review 记录人工审批。
 func (s *Server) GetJob(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/jobs/")
+	rest := strings.Trim(r.URL.Path[len("/v1/jobs/"):], "/")
+	parts := strings.SplitN(rest, "/", 2)
+	id := parts[0]
 	if id == "" {
 		http.Error(w, "job id required", http.StatusBadRequest)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "review" && r.Method == http.MethodPatch {
+		s.ReviewJob(w, r, id)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	job, err := s.O.Get(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, job)
+}
+
+type reviewRequest struct {
+	Status string `json:"status"` // approved | rejected
+	Note   string `json:"note"`
+}
+
+// ReviewJob 记录人工审批结论并持久化。
+func (s *Server) ReviewJob(w http.ResponseWriter, r *http.Request, id string) {
+	var req reviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	job, err := s.O.SetReview(id, req.Status, req.Note)
+	if err != nil {
+		code := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "not found") {
+			code = http.StatusNotFound
+		} else if strings.Contains(err.Error(), "invalid review") {
+			code = http.StatusBadRequest
+		}
+		http.Error(w, err.Error(), code)
 		return
 	}
 	writeJSON(w, http.StatusOK, job)

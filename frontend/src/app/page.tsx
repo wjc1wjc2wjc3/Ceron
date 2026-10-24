@@ -17,6 +17,8 @@ interface Job {
   vertical: string;
   status: string;
   result: any | null;
+  review_status?: string;
+  review_note?: string;
   submittedAt: number;
 }
 
@@ -51,7 +53,6 @@ export default function Home() {
   const [asyncMode, setAsyncMode] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [review, setReview] = useState<Record<string, "approved" | "rejected">>({});
   const timers = useRef<Record<string, any>>({});
 
   useEffect(() => {
@@ -107,6 +108,21 @@ export default function Home() {
         delete timers.current[id];
       }
     }, 800);
+  }
+
+  async function applyReview(id: string, status: "approved" | "rejected") {
+    const res = await fetch(`/api/v1/jobs/${id}/review`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) return;
+    const job = await res.json();
+    setJobs((j) =>
+      j.map((x) =>
+        x.id === id ? { ...x, review_status: job.review_status, review_note: job.review_note } : x
+      )
+    );
   }
 
   const sel = jobs.find((j) => j.id === selected) || null;
@@ -202,12 +218,12 @@ export default function Home() {
                           color={ACTION_COLOR[j.result.decision.action as DecisionAction]}
                         />
                       )}
-                      {review[j.id] && (
+                      {j.review_status && (
                         <Chip
                           size="small"
-                          icon={review[j.id] === "approved" ? <CheckCircleIcon /> : <CancelIcon />}
-                          label={review[j.id] === "approved" ? "已通过" : "已驳回"}
-                          color={review[j.id] === "approved" ? "success" : "error"}
+                          icon={j.review_status === "approved" ? <CheckCircleIcon /> : <CancelIcon />}
+                          label={j.review_status === "approved" ? "已通过" : "已驳回"}
+                          color={j.review_status === "approved" ? "success" : "error"}
                         />
                       )}
                     </Stack>
@@ -230,8 +246,8 @@ export default function Home() {
                 variant="outlined"
                 color="success"
                 startIcon={<CheckCircleIcon />}
-                onClick={() => setReview((r) => ({ ...r, [sel.id]: "approved" }))}
-                disabled={!!review[sel.id]}
+                onClick={() => applyReview(sel.id, "approved")}
+                disabled={!!sel.review_status}
               >
                 人工通过
               </Button>
@@ -240,8 +256,8 @@ export default function Home() {
                 variant="outlined"
                 color="error"
                 startIcon={<CancelIcon />}
-                onClick={() => setReview((r) => ({ ...r, [sel.id]: "rejected" }))}
-                disabled={!!review[sel.id]}
+                onClick={() => applyReview(sel.id, "rejected")}
+                disabled={!!sel.review_status}
               >
                 人工驳回
               </Button>

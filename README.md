@@ -29,7 +29,7 @@ Ceron/
 │       ├── internal/ingest/      # WhatsApp/企業微信 webhook 收件适配
 │       ├── internal/connectors/  # CRM webhook 同步
 │       ├── internal/orchestrator/# 同步/异步流水线编排
-│       └── internal/handler/     # /v1/intake(+/async)、/v1/ingest/*、/v1/jobs
+│       └── internal/handler/     # /v1/intake(+/async)、/v1/ingest/*、/v1/jobs、/v1/jobs/{id}/review
 ├── docs/                     # 部署与运维文档（Windows/macOS/Linux）
 │   ├── DEPLOYMENT.md
 │   └── OPERATIONS.md
@@ -85,7 +85,7 @@ cd backend/python-svc && py poc/bilingual_poc.py
 
 **Python 智能服务层**：`GET /health`；`POST /v1/ocr`（image_base64→文本）；`POST /v1/extract`；`POST /v1/enrich`；`POST /v1/decision`；`POST /v1/pipeline`（text 或 image_base64，串联 OCR→抽取→富集→决策）。`vertical` 取值：`insurance_hk`、`family_office`。
 
-**Go 网关**：`GET /health`；`POST /v1/intake`（同步）；`POST /v1/intake/async`（异步，202+轮询）；`POST /v1/ingest/whatsapp`、`POST /v1/ingest/wecom`（渠道收件，默认 insurance_hk）；`GET /v1/jobs/{id}`；作业完成后自动回调 `CRM_WEBHOOK_URL`（如配置）。
+**Go 网关**：`GET /health`；`POST /v1/intake`（同步）；`POST /v1/intake/async`（异步，202+轮询）；`POST /v1/ingest/whatsapp`、`POST /v1/ingest/wecom`（渠道收件，默认 insurance_hk）；`GET /v1/jobs`、`GET /v1/jobs/{id}`；`PATCH /v1/jobs/{id}/review`（人工审批 approved/rejected，持久化）；作业完成后自动回调 `CRM_WEBHOOK_URL`（如配置）。
 
 可插拔数据源（`.env` 配置）：LLM（deepseek/qwen/glm/openai/claude）、OCR（azure/tesseract）、Enrichment（ICRIS / 制裁名单），均 mock 兜底，外部源失败自动降级为人工复核标记。
 

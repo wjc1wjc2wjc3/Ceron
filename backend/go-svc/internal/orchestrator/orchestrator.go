@@ -14,12 +14,14 @@ import (
 
 // Job 表示一次文档处理作业。
 type Job struct {
-	ID        string                 `json:"id"`
-	Vertical  string                 `json:"vertical"`
-	Status    string                 `json:"status"` // queued | processing | completed | failed
-	Result    map[string]interface{} `json:"result,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	CreatedAt time.Time              `json:"created_at"`
+	ID           string                 `json:"id"`
+	Vertical     string                 `json:"vertical"`
+	Status       string                 `json:"status"` // queued | processing | completed | failed
+	Result       map[string]interface{} `json:"result,omitempty"`
+	Error        string                 `json:"error,omitempty"`
+	ReviewStatus string                 `json:"review_status,omitempty"` // "" | approved | rejected
+	ReviewNote   string                 `json:"review_note,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
 }
 
 // JobStore 作业持久化接口；实现见 internal/store（内存 / Postgres）。
@@ -147,4 +149,30 @@ func (o *Orchestrator) List() ([]*Job, error) {
 		out = append(out, j)
 	}
 	return out, nil
+}
+
+// SetReview 记录人工审批结论（approved/rejected），持久化并返回更新后的作业。
+// 支持作业不在内存缓存时回源持久化存储。
+func (o *Orchestrator) SetReview(id, status, note string) (*Job, error) {
+	if status != "approved" && status != "rejected" {
+		return nil, fmt.Errorf("invalid review status: %s", status)
+	}
+	o.mu.Lock()
+	job := o.jobs[id]
+	o.mu.Unlock()
+	if job == nil && o.Store != nil {
+		if j, err := o.Store.Get(id); err == nil {
+			job = j
+			o.mu.Lock()
+			o.jobs[id] = j
+			o.mu.Unlock()
+		}
+	}
+	if job == nil {
+		return nil, fmt.Errorf("job %s not found", id)
+	}
+	job.ReviewStatus = status
+	job.ReviewNote = note
+	o.persist(job)
+	return job, nil
 }
