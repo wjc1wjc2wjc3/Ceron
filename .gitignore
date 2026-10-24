@@ -26,3 +26,6 @@ ceron-gateway.exe
 Thumbs.db
 .idea/
 .vscode/
+
+# ===== 一键启动脚本日志（scripts/start.* 输出）=====
+logs/
