@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ceron-config
+  namespace: ceron
+data:
+  # python-svc
+  LLM_PROVIDER: "mock"          # mock | deepseek | qwen | glm | openai | claude
+  DATA_REGION: "hk"             # 数据驻留：hk（PDPO）
+  OCR_PROVIDER: "mock"          # mock | azure | tesseract
+  ENRICHMENT_PROVIDER: "mock"   # mock | icris | sanctions
+  # go-svc
+  PYTHON_SVC_URL: "http://python-svc:8000"
+  GO_SVC_PORT: "8080"
+  WORKERS: "4"
+  # frontend
+  API_BASE: "http://go-svc:8080"

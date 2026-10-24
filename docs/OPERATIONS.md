@@ -18,12 +18,18 @@ frontend :3000  ──/api 反代──▶  go-svc :8080  ──REST──▶  p
 
 ## 2. 日常运维
 
-- **启动/停止**：Docker `docker compose up -d / down`；systemd `systemctl restart ceron-python ceron-gateway`；Windows NSSM `nssm restart CeronPython`。
+- **启动/停止**：
+  - Docker：`docker compose up -d / down`
+  - Kubernetes：`kubectl -n ceron rollout restart deploy/<svc>` 重启；`kubectl -n ceron scale deploy/<svc> --replicas=N` 扩缩
+  - systemd：`systemctl restart ceron-python ceron-gateway`
+  - Windows NSSM：`nssm restart CeronPython`
 - **日志**：
-  - Docker：`docker compose logs -f go-svc python-svc`
+  - Docker：`docker compose logs -f go-svc python-svc frontend`
+  - Kubernetes：`kubectl -n ceron logs -f deploy/<svc>`
   - systemd：`journalctl -u ceron-python -f`
   - Windows NSSM：查看 NSSM 配置的输出文件或事件查看器。
 - **关键日志**：go-svc 启动行会打印 `python svc=…, workers=N, crm=…`，可确认配置生效；Python 控制台打印 uvicorn 访问日志。
+- **配置热更新（容器/K8s）**：改 `deploy/k8s/01-configmap.yaml` 后 `kubectl apply -f` 并 `rollout restart`；敏感项改 `02-secret.yaml` 同理。
 
 ## 3. 监控建议
 
@@ -34,15 +40,21 @@ frontend :3000  ──/api 反代──▶  go-svc :8080  ──REST──▶  p
 ## 4. 升级与回滚
 
 ```bash
-# 升级
+# 升级（Docker）
 git pull
 cd backend/python-svc && py -3 -m pytest -q      # 测试
 cd ../go-svc && go build ./... && go vet ./...   # 构建
 docker compose up --build -d                     # 或逐服务重启
 
-# 回滚
-git checkout <上一个发布 tag>
-docker compose up --build -d
+# 升级（Kubernetes）
+git pull && docker build/push 新镜像             # 见 DEPLOYMENT.md §3.3
+kubectl apply -k deploy/k8s                       # 配置/清单变更
+kubectl -n ceron rollout restart deploy/python-svc deploy/go-svc deploy/frontend
+
+# 回滚（Docker）
+git checkout <上一个发布 tag> && docker compose up --build -d
+# 回滚（Kubernetes）
+kubectl -n ceron rollout undo deploy/<svc>
 ```
 
 升级顺序：先 python-svc（接口向后兼容），再 go-svc，最后 frontend。
@@ -75,6 +87,7 @@ docker compose up --build -d
 | 新增配置项（env） | 对应 `.env.example` + `docs/DEPLOYMENT.md` §2 + 本手册 §5 |
 | 新增服务/端口 | `docs/DEPLOYMENT.md`、本手册 §1、`docker-compose.yml` |
 | 新增模块/能力 | 根 `README.md` 架构与能力清单 |
+| 部署方式变化（Docker/Nginx/K8s） | `docs/DEPLOYMENT.md`、对应 `deploy/` 产物（nginx/k8s）、本手册 §2/§4 |
 | 验证状态变化 | 根 `README.md`「已验证」章节（测试数、构建结果） |
 
-提交前检查项：代码改了，上表对应文档是否也改了？
+提交前检查项：代码改了，上表对应文档与 `deploy/` 部署产物是否也改了？

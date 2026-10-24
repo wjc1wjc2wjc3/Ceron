@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-svc
+  namespace: ceron
+  labels: { app: go-svc }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: go-svc }
+  template:
+    metadata:
+      labels: { app: go-svc }
+    spec:
+      containers:
+        - name: go-svc
+          image: ceron/go-svc:latest
+          ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: ceron-config }
+            - secretRef: { name: ceron-secrets }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-svc
+  namespace: ceron
+spec:
+  selector: { app: go-svc }
+  ports:
+    - { port: 8080, targetPort: 8080 }

@@ -33,6 +33,9 @@ Ceron/
 ├── docs/                     # 部署与运维文档（Windows/macOS/Linux）
 │   ├── DEPLOYMENT.md
 │   └── OPERATIONS.md
+├── deploy/                   # 部署产物
+│   ├── nginx/ceron.conf      # Nginx 反代 + TLS 站点配置
+│   └── k8s/                  # K8s 清单（namespace/configmap/secret/3×Deployment+Service/Ingress）
 ├── docker-compose.yml        # 一键编排 frontend + go-svc + python-svc
 ├── README.md
 └── Heron产品与技术架构分析.md
