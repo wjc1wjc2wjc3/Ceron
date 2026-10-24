@@ -24,6 +24,7 @@ type Job struct {
 	ReviewNote   string                 `json:"review_note,omitempty"`
 	ReviewedBy   string                 `json:"reviewed_by,omitempty"` // 审批人（默认 manual）
 	ReviewedAt   time.Time              `json:"reviewed_at,omitempty"`
+	Locale       string                 `json:"locale,omitempty"` // zh-HK | en | zh-CN
 	CreatedAt    time.Time              `json:"created_at"`
 }
 
@@ -42,7 +43,7 @@ type Orchestrator struct {
 	Store JobStore
 	Queue queue.Queue
 	// PipelineFn 可覆盖默认 Python 调用（测试桩用）；为 nil 时调用 Py.Pipeline。
-	PipelineFn func(vertical, text string) (map[string]interface{}, error)
+	PipelineFn func(vertical, text, locale string) (map[string]interface{}, error)
 	// OnComplete 在作业成功完成后回调（如 CRM 同步）；在独立 goroutine 中执行。
 	OnComplete func(*Job)
 
@@ -55,16 +56,16 @@ func New(py *client.PythonClient, store JobStore) *Orchestrator {
 	return &Orchestrator{Py: py, Store: store, jobs: make(map[string]*Job)}
 }
 
-func (o *Orchestrator) pipeline(vertical, text string) (map[string]interface{}, error) {
+func (o *Orchestrator) pipeline(vertical, text, locale string) (map[string]interface{}, error) {
 	if o.PipelineFn != nil {
-		return o.PipelineFn(vertical, text)
+		return o.PipelineFn(vertical, text, locale)
 	}
-	return o.Py.Pipeline(vertical, text)
+	return o.Py.Pipeline(vertical, text, locale)
 }
 
 // Run 同步执行一次流水线（阻塞直至完成）。
-func (o *Orchestrator) Run(id, vertical, text string) (*Job, error) {
-	job := o.newJob(id, vertical)
+func (o *Orchestrator) Run(id, vertical, text, locale string) (*Job, error) {
+	job := o.newJob(id, vertical, locale)
 	o.Process(id, vertical, text)
 	if job.Status == "failed" {
 		return job, fmt.Errorf("%s", job.Error)
@@ -73,8 +74,8 @@ func (o *Orchestrator) Run(id, vertical, text string) (*Job, error) {
 }
 
 // Submit 异步提交作业，立即返回（状态 queued）；未配置 Queue 时退化为同步。
-func (o *Orchestrator) Submit(id, vertical, text string) *Job {
-	job := o.newJob(id, vertical)
+func (o *Orchestrator) Submit(id, vertical, text, locale string) *Job {
+	job := o.newJob(id, vertical, locale)
 	if o.Queue == nil {
 		o.Process(id, vertical, text)
 	} else {
@@ -83,8 +84,8 @@ func (o *Orchestrator) Submit(id, vertical, text string) *Job {
 	return job
 }
 
-func (o *Orchestrator) newJob(id, vertical string) *Job {
-	job := &Job{ID: id, Vertical: vertical, Status: "queued", CreatedAt: time.Now()}
+func (o *Orchestrator) newJob(id, vertical, locale string) *Job {
+	job := &Job{ID: id, Vertical: vertical, Locale: locale, Status: "queued", CreatedAt: time.Now()}
 	o.persist(job)
 	return job
 }
@@ -110,7 +111,7 @@ func (o *Orchestrator) Process(jobID, vertical, text string) {
 	job.Status = "processing"
 	o.persist(job)
 
-	res, err := o.pipeline(vertical, text)
+	res, err := o.pipeline(vertical, text, job.Locale)
 	if err != nil {
 		job.Status = "failed"
 		job.Error = err.Error()

@@ -40,12 +40,14 @@ class DecisionReq(BaseModel):
     vertical: Vertical
     extracted: dict
     enrichment: dict = {}
+    locale: str = "zh-HK"
 
 
 class PipelineReq(BaseModel):
     vertical: Vertical
     text: str = ""
     image_base64: str = ""
+    locale: str = "zh-HK"
 
 
 @app.get("/health")
@@ -73,7 +75,7 @@ def enrich_endpoint(req: EnrichReq):
 @app.post("/v1/decision")
 def decision_endpoint(req: DecisionReq):
     return {"vertical": req.vertical.value,
-            "decision": assess(req.vertical, req.extracted, req.enrichment)}
+            "decision": assess(req.vertical, req.extracted, req.enrichment, req.locale)}
 
 
 @app.post("/v1/pipeline")
@@ -88,8 +90,8 @@ async def pipeline_endpoint(req: PipelineReq):
         return {"error": "text 或 image_base64 至少提供一项"}
 
     res = await extract_document(text, req.vertical)
-    enrichment = enrich(req.vertical.value, res["extracted"])
-    decision = assess(req.vertical, res["extracted"], enrichment)
+    enrichment = enrich(req.vertical.value, res["extracted"], req.locale)
+    decision = assess(req.vertical, res["extracted"], enrichment, req.locale)
     return {
         "vertical": res["vertical"],
         "ocr_used": ocr_used,

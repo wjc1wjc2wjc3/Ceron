@@ -28,11 +28,31 @@ interface Job {
 
 const PAGE_SIZE = 10;
 
-const SAMPLES: Record<string, string> = {
-  insurance_hk:
-    "投保人：香港環宇保險有限公司\n保單號：HK12345\n受保人：張三\n險種：終身壽險\n保額：800萬\n年繳保費：20萬\n理賠類型：身故\n理賠金額：120萬\n資料完整度：0.9",
-  family_office:
-    "客戶姓名：陳大文家族辦公室有限公司\n身份類型：公司（家族辦公室）\n資產規模：50,000萬港元\n資金來源：家族持股出售所得\n受益所有人：陳大文\n風險等級：中\nKYC狀態：待補",
+// 範例文本按 locale 本地化，避免简体界面混入繁体示例。
+const SAMPLES: Record<string, Record<string, string>> = {
+  "zh-HK": {
+    insurance_hk:
+      "投保人：香港環宇保險有限公司\n保單號：HK12345\n受保人：張三\n險種：終身壽險\n保額：800萬\n年繳保費：20萬\n理賠類型：身故\n理賠金額：120萬\n資料完整度：0.9",
+    family_office:
+      "客戶姓名：陳大文家族辦公室有限公司\n身份類型：公司（家族辦公室）\n資產規模：50,000萬港元\n資金來源：家族持股出售所得\n受益所有人：陳大文\n風險等級：中\nKYC狀態：待補",
+  },
+  en: {
+    insurance_hk:
+      "Policyholder: Hong Kong Universal Insurance Ltd\nPolicy No: HK12345\nInsured: Zhang San\nProduct: Whole Life\nSum Assured: 8,000,000\nAnnual Premium: 200,000\nClaim Type: Death\nClaim Amount: 1,200,000\nCompleteness: 0.9",
+    family_office:
+      "Client: Chan Tai Man Family Office Ltd\nEntity Type: Company (Family Office)\nAssets: 500,000,000 HKD\nSource of Funds: proceeds from sale of family shareholding\nBeneficial Owner: Chan Tai Man\nRisk Level: Medium\nKYC Status: Pending",
+  },
+  "zh-CN": {
+    insurance_hk:
+      "投保人：香港环宇保险有限公司\n保单号：HK12345\n受保人：张三\n险种：终身寿险\n保额：800万\n年缴保费：20万\n理赔类型：身故\n理赔金额：120万\n资料完整度：0.9",
+    family_office:
+      "客户姓名：陈大文家族办公室有限公司\n身份类型：公司（家族办公室）\n资产规模：500,000万港元\n资金来源：家族持股出售所得\n受益所有人：陈大文\n风险等级：中\nKYC状态：待补",
+  },
+};
+
+const sampleFor = (loc: string, vertical: string): string => {
+  const byLoc = SAMPLES[loc] || SAMPLES["zh-HK"];
+  return byLoc[vertical] ?? byLoc.insurance_hk;
 };
 
 const ACTION_COLOR: Record<DecisionAction, "success" | "warning" | "error"> = {
@@ -62,10 +82,10 @@ export default function Home() {
 }
 
 function Dashboard() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [health, setHealth] = useState<any>(null);
   const [vertical, setVertical] = useState("insurance_hk");
-  const [text, setText] = useState(SAMPLES.insurance_hk);
+  const [text, setText] = useState(sampleFor("zh-HK", "insurance_hk"));
   const [asyncMode, setAsyncMode] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -113,7 +133,7 @@ function Dashboard() {
   }, []);
 
   async function submit() {
-    const body = JSON.stringify({ vertical, text });
+    const body = JSON.stringify({ vertical, text, locale });
     const url = asyncMode ? "/api/v1/intake/async" : "/api/v1/intake";
     const res = await fetch(url, {
       method: "POST",
@@ -198,6 +218,10 @@ function Dashboard() {
               >
                 <MenuItem value="insurance_hk">{t("v.insurance_hk")}</MenuItem>
                 <MenuItem value="family_office">{t("v.family_office")}</MenuItem>
+                <MenuItem value="banking_mortgage">{t("v.banking_mortgage")}</MenuItem>
+                <MenuItem value="securities_suitability">{t("v.securities_suitability")}</MenuItem>
+                <MenuItem value="mpf">{t("v.mpf")}</MenuItem>
+                <MenuItem value="fund_ofc_lpf">{t("v.fund_ofc_lpf")}</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -210,7 +234,7 @@ function Dashboard() {
               sx={{ mb: 1 }}
             />
             <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-              <Button size="small" onClick={() => setText(SAMPLES[vertical])}>
+              <Button size="small" onClick={() => setText(sampleFor(locale, vertical))}>
                 {t("loadSample")}
               </Button>
             </Stack>
@@ -287,10 +311,10 @@ function Dashboard() {
                       <Typography variant="body2" noWrap sx={{ maxWidth: 160 }}>
                         {j.id}
                       </Typography>
-                      <Chip size="small" label={j.status} color={STATUS_COLOR[j.status] || "default"} />
+                      <Chip size="small" label={t("status." + j.status)} color={STATUS_COLOR[j.status] || "default"} />
                     </Stack>
                     <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center">
-                      <Chip size="small" label={j.vertical} variant="outlined" />
+                      <Chip size="small" label={t("v." + j.vertical)} variant="outlined" />
                       {j.result?.decision?.action && (
                         <Chip
                           size="small"
@@ -394,8 +418,12 @@ function Dashboard() {
                   <Typography variant="body2">
                     {t("icris")}
                     {enrichment?.icris_verified ? t("yes") : t("no")} · {t("sanctions")}
-                    {enrichment?.sanctions_hit ? t("yes") : t("no")} · {t("risk")}
-                    {enrichment?.risk_from_enrich || "-"}
+                    {enrichment?.sanctions_hit ? t("yes") : t("no")} ·                     {t("risk")}
+                    {enrichment?.risk_from_enrich === "high"
+                      ? t("riskHigh")
+                      : enrichment?.risk_from_enrich === "normal"
+                      ? t("riskNormal")
+                      : (enrichment?.risk_from_enrich || "-")}
                   </Typography>
                   {(enrichment?.flags || []).map((f: string, i: number) => (
                     <Chip key={i} size="small" color="warning" label={f} sx={{ alignSelf: "flex-start" }} />

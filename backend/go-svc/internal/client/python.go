@@ -27,11 +27,12 @@ func New(baseURL string) *PythonClient {
 type pipelineRequest struct {
 	Vertical string `json:"vertical"`
 	Text     string `json:"text"`
+	Locale   string `json:"locale"`
 }
 
 // Pipeline 调用 /v1/pipeline，串联 抽取→富集→决策。
-func (c *PythonClient) Pipeline(vertical, text string) (map[string]interface{}, error) {
-	body, err := json.Marshal(pipelineRequest{Vertical: vertical, Text: text})
+func (c *PythonClient) Pipeline(vertical, text, locale string) (map[string]interface{}, error) {
+	body, err := json.Marshal(pipelineRequest{Vertical: vertical, Text: text, Locale: locale})
 	if err != nil {
 		return nil, err
 	}

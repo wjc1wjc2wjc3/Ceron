@@ -27,6 +27,7 @@ func New(o *orchestrator.Orchestrator) *Server {
 type intakeRequest struct {
 	Vertical string `json:"vertical"`
 	Text     string `json:"text"`
+	Locale   string `json:"locale"` // zh-HK | en | zh-CN，用于后端决策/富集文案本地化
 }
 
 // Register 注册路由到给定的 ServeMux。
@@ -49,7 +50,7 @@ func (s *Server) Intake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := newJobID()
-	job, err := s.O.Run(id, req.Vertical, req.Text)
+	job, err := s.O.Run(id, req.Vertical, req.Text, req.Locale)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, job)
 		return
@@ -63,7 +64,7 @@ func (s *Server) IntakeAsync(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	job := s.O.Submit(newJobID(), req.Vertical, req.Text)
+	job := s.O.Submit(newJobID(), req.Vertical, req.Text, req.Locale)
 	writeJSON(w, http.StatusAccepted, job)
 }
 
@@ -79,7 +80,7 @@ func (s *Server) IngestWhatsApp(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	job := s.O.Submit(newJobID(), msg.Vertical, msg.Text)
+	job := s.O.Submit(newJobID(), msg.Vertical, msg.Text, "")
 	writeJSON(w, http.StatusAccepted, job)
 }
 
@@ -95,7 +96,7 @@ func (s *Server) IngestWeCom(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	job := s.O.Submit(newJobID(), msg.Vertical, msg.Text)
+	job := s.O.Submit(newJobID(), msg.Vertical, msg.Text, "")
 	writeJSON(w, http.StatusAccepted, job)
 }
 

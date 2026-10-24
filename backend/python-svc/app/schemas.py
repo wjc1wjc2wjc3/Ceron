@@ -12,6 +12,11 @@ from pydantic import BaseModel
 class Vertical(str, Enum):
     insurance_hk = "insurance_hk"
     family_office = "family_office"
+    # —— 业务补充（路线图优先级 1，扩展承保/合规覆盖）——
+    banking_mortgage = "banking_mortgage"          # 银行按揭承保（HKMA）
+    securities_suitability = "securities_suitability"  # 证券合适性（SFC）
+    mpf = "mpf"                                    # 强积金（MPFA）
+    fund_ofc_lpf = "fund_ofc_lpf"                  # 基金/OFC/LPF/REIT（SFC Type 9）
 
 
 class InsuranceHKApplication(BaseModel):
@@ -41,6 +46,20 @@ class FamilyOfficeProfile(BaseModel):
     KYC状态: Optional[str] = None
 
 
+class GenericProfile(BaseModel):
+    """未知 / 新增业务线的通用兜底模型：不限制字段，LLM 自由抽取。"""
+
+    model_config = {"extra": "allow"}
+
+    客户姓名或实体名称: Optional[str] = None
+    身份类型: Optional[str] = None
+    资产规模港币万: Optional[float] = None
+    资金来源: Optional[str] = None
+    受益所有人: Optional[str] = None
+    风险等级: Optional[str] = None
+    KYC状态: Optional[str] = None
+
+
 _SCHEMAS = {
     Vertical.insurance_hk: InsuranceHKApplication,
     Vertical.family_office: FamilyOfficeProfile,
@@ -48,4 +67,5 @@ _SCHEMAS = {
 
 
 def get_schema(vertical: Vertical):
-    return _SCHEMAS[vertical]
+    # 已知业务线用专属 schema；其余（含新增业务线）走通用兜底，保证流水线不中断。
+    return _SCHEMAS.get(vertical, GenericProfile)

@@ -12,11 +12,11 @@ import (
 func TestRunPersistsAndLists(t *testing.T) {
 	st := store.NewMemory()
 	orc := orchestrator.New(nil, st) // Py 为 nil 也安全，因为使用 PipelineFn 桩
-	orc.PipelineFn = func(vertical, text string) (map[string]interface{}, error) {
+	orc.PipelineFn = func(vertical, text, locale string) (map[string]interface{}, error) {
 		return map[string]interface{}{"vertical": vertical, "ok": true}, nil
 	}
 
-	job, err := orc.Run("j1", "insurance_hk", "保单文本")
+	job, err := orc.Run("j1", "insurance_hk", "保单文本", "zh-HK")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,10 +41,10 @@ func TestRunPersistsAndLists(t *testing.T) {
 func TestSetReviewAudit(t *testing.T) {
 	st := store.NewMemory()
 	orc := orchestrator.New(nil, st)
-	orc.PipelineFn = func(vertical, text string) (map[string]interface{}, error) {
+	orc.PipelineFn = func(vertical, text, locale string) (map[string]interface{}, error) {
 		return map[string]interface{}{"ok": true}, nil
 	}
-	if _, err := orc.Run("r1", "insurance_hk", "text"); err != nil {
+	if _, err := orc.Run("r1", "insurance_hk", "text", "zh-HK"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := orc.SetReview("r1", "approved", "looks good", "alice")
@@ -69,13 +69,13 @@ func TestSetReviewAudit(t *testing.T) {
 func TestAsyncPoolCompletes(t *testing.T) {
 	st := store.NewMemory()
 	orc := orchestrator.New(nil, st)
-	orc.PipelineFn = func(vertical, text string) (map[string]interface{}, error) {
+	orc.PipelineFn = func(vertical, text, locale string) (map[string]interface{}, error) {
 		return map[string]interface{}{"x": 1}, nil
 	}
 	pool := queue.NewPool(2, 8, orc.Process)
 	orc.Queue = pool
 
-	job := orc.Submit("a1", "family_office", "客户文本")
+	job := orc.Submit("a1", "family_office", "客户文本", "zh-HK")
 	if job.Status != "queued" {
 		t.Fatalf("should be queued, got %s", job.Status)
 	}
