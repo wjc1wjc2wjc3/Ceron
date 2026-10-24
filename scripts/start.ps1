@@ -1,8 +1,8 @@
-# Ceron 一键本地启动（Windows / PowerShell）
-# 依次拉起：python-svc(8000) → go-svc(8080) → frontend(3000)，Ctrl+C 一键停止全部。
+# Ceron one-click local launcher (Windows / PowerShell)
+# Starts python-svc(8000) -> go-svc(8080) -> frontend(3000), Ctrl+C stops all.
 param(
-  [switch]$NoBrowser,   # 不自动打开浏览器
-  [switch]$SkipInstall  # 跳过依赖安装（venv/npm install 已就绪时）
+  [switch]$NoBrowser,   # do not open browser
+  [switch]$SkipInstall  # skip dependency install (venv / npm install)
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,70 +21,90 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $Procs = @()
 
 function Stop-All {
-  Write-Host "`n[ceron] 停止所有服务…" -ForegroundColor Yellow
+  Write-Host "`n[ceron] stopping all services..." -ForegroundColor Yellow
   foreach ($p in $Procs) {
     if ($null -eq $p -or $p.HasExited) { continue }
     taskkill /PID $p.Id /T /F 2>$null | Out-Null
   }
-  Write-Host "[ceron] 已停止。" -ForegroundColor Green
+  Remove-Item (Join-Path $LogDir ".pids") -ErrorAction SilentlyContinue
+  Write-Host "[ceron] stopped." -ForegroundColor Green
 }
-# 注册 Ctrl+C / 关闭窗口时清理
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Stop-All }
+try { [Console]::TreatControlCAsInput = $false } catch {}
+
+# --- 1. Python intelligence layer (non-fatal: do not block go/frontend) ---
+Write-Host "[ceron] starting python-svc :$PyPort ..." -ForegroundColor Cyan
 try {
-  [Console]::TreatControlCAsInput = $false
-} catch {}
-
-# —— 1. Python 智能层 ——
-Write-Host "[ceron] 启动 python-svc :$PyPort …" -ForegroundColor Cyan
-$venv = Join-Path $PyDir ".venv"
-if (-not (Test-Path $venv)) {
-  if (-not $SkipInstall) { & python -m venv $venv | Out-Null }
+  $venv = Join-Path $PyDir ".venv"
+  if (-not (Test-Path $venv)) {
+    if (-not $SkipInstall) { & python -m venv $venv | Out-Null }
+  }
+  if (-not $SkipInstall -and (Test-Path (Join-Path $venv "Scripts/pip.exe"))) {
+    & (Join-Path $venv "Scripts/pip.exe") install -q -r (Join-Path $PyDir "requirements.txt") | Out-Null
+  }
+  $pyExe = if (Test-Path (Join-Path $venv "Scripts/python.exe")) {
+    Join-Path $venv "Scripts/python.exe"
+  } else { "python" }
+  if (-not (Get-Command $pyExe -ErrorAction SilentlyContinue)) {
+    throw "python interpreter not found ($pyExe)"
+  }
+  $p = Start-Process -FilePath $pyExe -WorkingDirectory $PyDir `
+    -ArgumentList "-m","uvicorn","app.main:app","--host","0.0.0.0","--port","$PyPort","--reload" `
+    -RedirectStandardOutput (Join-Path $LogDir "py.log") `
+    -RedirectStandardError  (Join-Path $LogDir "py.err") -NoNewWindow -PassThru
+  $Procs += $p
+} catch {
+  Write-Host "[ceron] WARNING: python-svc not started: $_" -ForegroundColor Yellow
 }
-if (-not $SkipInstall -and (Test-Path (Join-Path $venv "Scripts/pip.exe"))) {
-  & (Join-Path $venv "Scripts/pip.exe") install -q -r (Join-Path $PyDir "requirements.txt") | Out-Null
+
+# --- 2. Go gateway (build once, then run the binary so the recorded PID is the server) ---
+Write-Host "[ceron] starting go-svc :$GoPort ..." -ForegroundColor Cyan
+try {
+  $goBin = Join-Path $env:TEMP "ceron-gateway.exe"
+  Push-Location $GoDir
+  try {
+    & go build -o $goBin ./cmd/server 2>&1 | Out-Null
+  } finally {
+    Pop-Location
+  }
+  if (-not (Test-Path $goBin)) { throw "go build failed" }
+  $g = Start-Process -FilePath $goBin -WorkingDirectory $GoDir `
+    -RedirectStandardOutput (Join-Path $LogDir "go.log") `
+    -RedirectStandardError  (Join-Path $LogDir "go.err") -NoNewWindow -PassThru
+  $Procs += $g
+} catch {
+  Write-Host "[ceron] WARNING: go-svc not started: $_" -ForegroundColor Yellow
 }
-$pyExe = if (Test-Path (Join-Path $venv "Scripts/python.exe")) {
-  Join-Path $venv "Scripts/python.exe"
-} else { "python" }
-$p = Start-Process -FilePath $pyExe -WorkingDirectory $PyDir `
-  -ArgumentList "-m","uvicorn","app.main:app","--host","0.0.0.0","--port","$PyPort","--reload" `
-  -RedirectStandardOutput (Join-Path $LogDir "py.log") `
-  -RedirectStandardError  (Join-Path $LogDir "py.err") -NoNewWindow -PassThru
-$Procs += $p
 
-# —— 2. Go 网关 ——
-Write-Host "[ceron] 启动 go-svc :$GoPort …" -ForegroundColor Cyan
-$g = Start-Process -FilePath "go" -WorkingDirectory $GoDir `
-  -ArgumentList "run","./cmd/server" `
-  -RedirectStandardOutput (Join-Path $LogDir "go.log") `
-  -RedirectStandardError  (Join-Path $LogDir "go.err") -NoNewWindow -PassThru
-$Procs += $g
-
-# —— 3. 前端 ——
-Write-Host "[ceron] 启动 frontend :$FePort …" -ForegroundColor Cyan
+# --- 3. Frontend ---
+Write-Host "[ceron] starting frontend :$FePort ..." -ForegroundColor Cyan
 if (-not $SkipInstall -and -not (Test-Path (Join-Path $FeDir "node_modules"))) {
   & npm --prefix $FeDir install | Out-Null
 }
-$f = Start-Process -FilePath "npm" -WorkingDirectory $FeDir `
-  -ArgumentList "--prefix",$FeDir,"run","dev" `
+# npm on Windows is npm.cmd, launch via cmd /c
+$f = Start-Process -FilePath "cmd.exe" -WorkingDirectory $FeDir `
+  -ArgumentList "/c","npm","--prefix",$FeDir,"run","dev" `
   -RedirectStandardOutput (Join-Path $LogDir "fe.log") `
   -RedirectStandardError  (Join-Path $LogDir "fe.err") -NoNewWindow -PassThru
 $Procs += $f
 
+# Persist PIDs for external stop.bat
+$Procs | ForEach-Object { $_.Id } | Where-Object { $_ -ne 0 } | Out-File -Encoding ascii (Join-Path $LogDir ".pids")
+
 function Test-Health($url) {
   try { (Invoke-RestMethod -Uri $url -TimeoutSec 1).status } catch { $null }
 }
-Write-Host "[ceron] 等待服务就绪…" -ForegroundColor Cyan
-$pyOk=$false;$goOk=$false
-for ($i=0; $i -lt 30; $i++) {
-  if (-not $pyOk) { $r=Test-Health "http://localhost:$PyPort/health"; if ($r) { $pyOk=$true; Write-Host "  ✓ python-svc 就绪" -ForegroundColor Green } }
-  if (-not $goOk) { $r=Test-Health "http://localhost:$GoPort/health"; if ($r) { $goOk=$true; Write-Host "  ✓ go-svc 就绪" -ForegroundColor Green } }
+Write-Host "[ceron] waiting for services..." -ForegroundColor Cyan
+$pyOk = $false; $goOk = $false
+for ($i = 0; $i -lt 30; $i++) {
+  if (-not $pyOk) { $r = Test-Health "http://localhost:$PyPort/health"; if ($r) { $pyOk = $true; Write-Host "  OK python-svc" -ForegroundColor Green } }
+  if (-not $goOk) { $r = Test-Health "http://localhost:$GoPort/health"; if ($r) { $goOk = $true; Write-Host "  OK go-svc" -ForegroundColor Green } }
   if ($pyOk -and $goOk) { break }
   Start-Sleep -Seconds 1
 }
 Write-Host ""
-Write-Host "[ceron] 已全部启动。前端 http://localhost:$FePort   (Ctrl+C 停止)" -ForegroundColor Green
-Write-Host "[ceron]   日志目录: $LogDir" -ForegroundColor DarkGray
+Write-Host "[ceron] all started. Frontend http://localhost:$FePort   (Ctrl+C to stop)" -ForegroundColor Green
+Write-Host "[ceron]   logs: $LogDir" -ForegroundColor DarkGray
 
 if (-not $NoBrowser) {
   Start-Sleep -Seconds 3
