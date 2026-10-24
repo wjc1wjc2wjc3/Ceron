@@ -110,9 +110,3 @@ cd backend/python-svc && py poc/bilingual_poc.py
 - 持久化：作业表 Postgres（JSONB）+ NATS JetStream 异步队列已接入，经 build tag `postgres`/`nats` 启用；默认构建零外部依赖、走内存兜底。详见 `docs/DEPLOYMENT.md` §3.4/§6.6。
 - 审批持久化：`PATCH /v1/jobs/{id}/review` 落库（含审批人/时间审计），看板支持状态筛选与分页（服务端 `GET /v1/jobs?status=&limit=&offset=`）。
 - 富集端到端：ICRIS/制裁名单 Provider 配置即真实调用、失败自动降级（桩测试覆盖真实 HTTP 路径）；`py poc/e2e_enrichment.py` 可跑通 抽取→富集→决策。
-
-## 下一步建议
-1. 用真实密钥跑双语 PoC，评估国产/国际模型准确率差异（`LLM_API_KEY` 配好后 `py poc/bilingual_poc.py`）；
-2. ICRIS / 制裁名单填入真实凭证联调（代码已就绪：`ICRIS_API_URL`/`SANCTIONS_API_URL` 配置即启用，`py poc/e2e_enrichment.py` 验证）；
-3. Azure OCR 用真实月结单/保单扫描件调优；
-4. WhatsApp Cloud API / 企業微信回调真实报文适配（现 ingest 为简化载荷）。
