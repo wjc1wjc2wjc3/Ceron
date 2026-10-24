@@ -52,6 +52,10 @@ class Settings:
     # 是否启用后台周期性重查调度（默认关闭；生产建议开启以符合持续尽职要求）
     monitoring_enabled: bool = str(os.getenv("MONITORING_ENABLED", "false")).lower() == "true"
     monitoring_interval: int = int(os.getenv("MONITORING_INTERVAL_SECONDS", "300"))
+    # ===== 持久化（与 go-svc jobs 表对齐）=====
+    # 配置 DATABASE_URL 即切到 Postgres（JSONB 持久化）；未配置/连接失败回退内存。
+    # 建议与 go-svc 共用同一实例，使 Go 看板与 Python 决策历史落在同一 jobs 表。
+    database_url: str = os.getenv("DATABASE_URL", "")
 
 
 settings = Settings()

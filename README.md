@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-pytest%2031%20pass-brightgreen)
+![Tests](https://img.shields.io/badge/tests-pytest%2034%20pass-brightgreen)
 
 > **English**: Ceron is an underwriting & compliance automation platform for Hong Kong financial institutions (insurance, trusts, family offices) — multi-channel intake (API / WhatsApp / WeCom), bilingual document extraction, pluggable data enrichment (ICRIS / Land Search / credit bureau / OFAC / HMT / CRS), decisioning with SFC/HKMA/MPFA compliance gates, ongoing monitoring, SAR filing and regulatory MI reporting.
 
@@ -67,6 +67,64 @@ Ceron 定位为面向香港**中小企业金融与保险业**的**承保（under
 - **优先级 1（快赢，已实现）**：扩展 `Classify` 业务类型枚举 + `Enrich` 数据源 Provider（土地註冊 Land Search、信貸局 TU HK、OFAC/HMT 制裁名单、CRS/FATCA），均已实现为可插拔 Provider，配置对应 `*_API_URL` 即启用、失败自动降级人工复核。
 - **优先级 2（中，已实现）**：银行业按揭承保（HKMA LTV/DSR 闸口）、证券合适性（风险承受度 vs 产品风险）、MPF（雇主登记/供款合规）、基金/OFC/LPF（证监会认可与零售投资者限制）的合规閘口与决策规则，已落入 `assess()` 与专属抽取 Schema。
 - **优先级 3（长线，已实现）**：持续监控（触发式 re-KYC + 后台周期性重查制裁/OFAC/HMT，命中生成告警）+ SAR 申报（JFIU，草稿→已提交状态机）+ 监管 MI 报表（`/py/v1/mi` 聚合决策/告警/SAR）。前端新增「合规运营」页签整合三者。
+
+---
+
+## 数据源真实接入示例（ICRIS / 信贷局）
+
+富集层（`backend/python-svc/app/enrichment.py`）对每类数据源实现为可插拔 Provider：
+配置对应 `*_API_URL` 即启用**真实外呼**，未配置或调用失败时**自动降级**为
+「需人工複核」标记，流水线不中断。ICRIS 与信贷局已实现真实鉴权契约：
+
+### ICRIS（公司註冊處查冊）
+
+支持两种接入形态，在 `.env` 配置：
+
+- **会话态（推荐）**：`ICRIS_AUTH_URL` + `ICRIS_ACCOUNT` 登录换 token，再以
+  `Bearer <token>` 查询；兼容 ICRIS e-Services / 持牌数据服务商的 JSON 契约。
+- **直连态**：仅 `ICRIS_API_URL` + `ICRIS_API_KEY`，按契约 `POST {company_name}`。
+
+```dotenv
+ICRIS_API_URL=https://icris.vendor.example/api/companies
+ICRIS_AUTH_URL=https://icris.vendor.example/auth/token
+ICRIS_ACCOUNT=your_account
+ICRIS_API_KEY=your_key
+```
+
+响应归一化为 `icris_verified / icris_company_status / icris_br_status / icris_cr_no`，
+并自动识别「已解散 / 已撤銷註冊」标高风险。
+
+### 信贷局（TransUnion HK 等会员机构）
+
+以**会员编号 + API Key**（建议相互 TLS）调用信用报告接口：
+
+```dotenv
+CREDIT_BUREAU_API_URL=https://api.tucb.example/v1/credit-reports
+CREDIT_BUREAU_API_KEY=your_key
+CREDIT_BUREAU_MEMBER_ID=MEM-0001
+```
+
+请求头透传 `X-Member-Id` 与 `Authorization: Bearer`，响应归一化为
+`credit_score / credit_adverse`。其余数据源（土地註冊 / OFAC / HMT / CRS）配置
+`*_API_URL` 即启用，请求/响应契约见各 Provider 文档字符串。
+
+> 注：ICRIS、TU HK 真实接入需持有政府核准凭证或持牌数据服务商账号；代码已接好
+> 鉴权、请求契约与失败降级，填入凭证即可外呼真实数据。
+
+## 持久化（Postgres，与 go-svc 对齐）
+
+python-svc 的合规运营状态（决策历史 / 实体 / 监控告警 / SAR）默认存内存；配置
+`DATABASE_URL` 后自动切到 Postgres，并复用与 **go-svc 完全一致** 的 `jobs` 表
+（JSONB 持久化），另建 `entities / monitoring_alerts / sars` 三张配套表
+（DDL 见 `backend/python-svc/app/store.py`）。未配置或连接失败**安全回退内存**——
+与 go-svc「`DATABASE_URL` 未设即内存」的行为一致。
+
+```dotenv
+DATABASE_URL=postgresql://user:pass@localhost:5432/ceron
+```
+
+> 建议与 go-svc 共用同一 Postgres 实例，使 Go 看板与 Python 决策历史落在同一
+> `jobs` 表，便于统一查询、审计与水平扩展（多实例 + 重启不丢）。
 
 ---
 
