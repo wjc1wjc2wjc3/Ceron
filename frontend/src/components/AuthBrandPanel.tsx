@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { Box, Stack, Typography } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
+import { useT } from "../app/i18n";
 
 /** 登录/注册共用的左侧品牌面板（深色渐变 + 价值主张）。 */
 export default function AuthBrandPanel({ quoteKey, personKey }: { quoteKey: string; personKey: string }) {
+  const { t } = useT();
+  const lines = ["authLine1", "authLine2", "authLine3"];
   return (
     <Box
       sx={{
@@ -26,30 +29,26 @@ export default function AuthBrandPanel({ quoteKey, personKey }: { quoteKey: stri
 
       <Box>
         <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, lineHeight: 1.35 }}>
-          “{quoteKey}”
+          “{t(quoteKey)}”
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.8 }}>
-          {personKey}
+          {t(personKey)}
         </Typography>
       </Box>
 
       <Stack spacing={1.5}>
-        {[
-          "Intake → Extract → Enrich → Decision",
-          "ICRIS · Land Search · Credit bureau · OFAC / HMT · CRS",
-          "SFC / HKMA / MPFA compliance gates built in",
-        ].map((line) => (
+        {lines.map((line) => (
           <Stack key={line} direction="row" spacing={1} alignItems="center">
             <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#7df0c6" }} />
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              {line}
+              {t(line)}
             </Typography>
           </Stack>
         ))}
       </Stack>
 
       <Typography variant="caption" sx={{ opacity: 0.7 }} component={Link} href="/">
-        ← Back to ceron.ai
+        {t("authBackHome")}
       </Typography>
     </Box>
   );

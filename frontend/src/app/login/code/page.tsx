@@ -7,12 +7,13 @@ import {
   Alert, Box, Button, Stack, TextField, Typography,
 } from "@mui/material";
 import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
-import { I18nProvider } from "../../i18n";
+import { I18nProvider, LanguageSwitcher, useT } from "../../i18n";
 import { useAuth } from "../../../components/AuthProvider";
 
 type Stage = "request" | "verify";
 
 function EmailCodeForm() {
+  const { t, tf } = useT();
   const { setToken } = useAuth();
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("request");
@@ -37,7 +38,7 @@ function EmailCodeForm() {
       const data = await r.json();
       if (!r.ok) throw new Error(data?.detail || "send_failed");
       setDevCode(data.dev_code || ""); // 仅 SMTP 未配置时返回，便于本地调试
-      setNotice("We sent a 6-digit code to your inbox.");
+      setNotice(t("codeSent"));
       setStage("verify");
     } catch (err: any) {
       setError(err?.message || "send_failed");
@@ -70,24 +71,25 @@ function EmailCodeForm() {
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 3 }}>
       <Box sx={{ width: "100%", maxWidth: 420 }}>
-        <MarkEmailReadIcon sx={{ color: "primary.main", fontSize: 34, mb: 2 }} />
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <MarkEmailReadIcon sx={{ color: "primary.main", fontSize: 34 }} />
+          <LanguageSwitcher />
+        </Stack>
         <Typography variant="caption" sx={{ letterSpacing: 1.4, fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
-          PASSWORDLESS SIGN-IN
+          {t("codeKicker")}
         </Typography>
         <Typography variant="h3" sx={{ mb: 1 }}>
-          {stage === "request" ? "Sign in with email code" : "Enter your code"}
+          {stage === "request" ? t("codeTitleRequest") : t("codeTitleVerify")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          {stage === "request"
-            ? "No password needed — we email you a one-time code. New email? We create the account for you."
-            : `We sent a 6-digit code to ${email}. It expires in 10 minutes.`}
+          {stage === "request" ? t("codeSubRequest") : tf("codeSubVerify", { email })}
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
         {notice && <Alert severity="success" sx={{ mb: 3 }}>{notice}</Alert>}
         {devCode && (
           <Alert severity="info" sx={{ mb: 3 }}>
-            Development mode (no SMTP configured) — your code is <strong>{devCode}</strong>
+            {t("devCodeHint")} <strong>{devCode}</strong>
           </Alert>
         )}
 
@@ -95,11 +97,11 @@ function EmailCodeForm() {
           <Box component="form" onSubmit={requestCode}>
             <Stack spacing={2.5}>
               <TextField
-                label="Email" type="email" value={email} required fullWidth autoFocus
+                label={t("email")} type="email" value={email} required fullWidth autoFocus
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy} fullWidth>
-                {busy ? "Sending…" : "Email me a code"}
+                {busy ? t("sending") : t("emailMeCode")}
               </Button>
             </Stack>
           </Box>
@@ -107,24 +109,24 @@ function EmailCodeForm() {
           <Box component="form" onSubmit={verifyCode}>
             <Stack spacing={2.5}>
               <TextField
-                label="6-digit code" value={code} required fullWidth autoFocus
+                label={t("code6")} value={code} required fullWidth autoFocus
                 inputProps={{ maxLength: 6, pattern: "[0-9]*" }}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy || code.length < 6} fullWidth>
-                {busy ? "Verifying…" : "Verify and sign in"}
+                {busy ? t("verifying") : t("verifySignIn")}
               </Button>
               <Button variant="text" size="small" onClick={() => { setStage("request"); setError(""); }}>
-                Use a different email
+                {t("useDifferentEmail")}
               </Button>
             </Stack>
           </Box>
         )}
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-          Remember your password?{" "}
+          {t("rememberPassword")}{" "}
           <Link href="/login" style={{ color: "#1f4dff", fontWeight: 600 }}>
-            Sign in with password
+            {t("signInPassword")}
           </Link>
         </Typography>
       </Box>

@@ -3,34 +3,37 @@
 import Link from "next/link";
 import { Box, Divider, Grid, Stack, Typography } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
-
-const COLUMNS = [
-  {
-    title: "Platform",
-    items: [
-      { label: "Product capabilities", href: "/products" },
-      { label: "Architecture", href: "/products#architecture" },
-      { label: "Console", href: "/app" },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Ongoing monitoring", href: "/app/compliance" },
-      { label: "SAR filing (JFIU)", href: "/app/compliance" },
-      { label: "Regulatory MI", href: "/app/compliance" },
-    ],
-  },
-  {
-    title: "Company",
-    items: [
-      { label: "GitHub", href: "https://github.com" },
-      { label: "Contact", href: "mailto:hello@ceron.ai" },
-    ],
-  },
-];
+import { useT } from "../app/i18n";
 
 export default function SiteFooter() {
+  const { t } = useT();
+
+  const columns = [
+    {
+      titleKey: "footerPlatform",
+      items: [
+        { key: "fProductCaps", href: "/products" },
+        { key: "fArchitecture", href: "/products#architecture" },
+        { key: "fConsole", href: "/app" },
+      ],
+    },
+    {
+      titleKey: "footerCompliance",
+      items: [
+        { key: "fMonitoring", href: "/app/compliance" },
+        { key: "fSar", href: "/app/compliance" },
+        { key: "fMi", href: "/app/compliance" },
+      ],
+    },
+    {
+      titleKey: "footerCompany",
+      items: [
+        { key: "fGithub", href: "https://github.com" },
+        { key: "fContact", href: "mailto:hello@ceron.ai" },
+      ],
+    },
+  ];
+
   return (
     <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "#fafbfd" }}>
       <Box sx={{ maxWidth: 1180, mx: "auto", px: { xs: 2.5, md: 4 }, py: 7 }}>
@@ -43,24 +46,24 @@ export default function SiteFooter() {
               </Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320 }}>
-              Underwriting and compliance automation built for Hong Kong financial institutions.
+              {t("footerBlurb")}
             </Typography>
           </Grid>
-          {COLUMNS.map((c) => (
-            <Grid item xs={6} md={2.66} key={c.title}>
+          {columns.map((c) => (
+            <Grid item xs={6} md={2.66} key={c.titleKey}>
               <Typography variant="caption" fontWeight={700} color="text.secondary">
-                {c.title.toUpperCase()}
+                {t(c.titleKey)}
               </Typography>
               <Stack spacing={1} sx={{ mt: 2 }}>
                 {c.items.map((i) => (
                   <Typography
-                    key={i.label}
+                    key={i.key}
                     variant="body2"
                     component={Link}
                     href={i.href}
                     sx={{ textDecoration: "none", color: "text.primary", "&:hover": { color: "primary.main" } }}
                   >
-                    {i.label}
+                    {t(i.key)}
                   </Typography>
                 ))}
               </Stack>
@@ -70,10 +73,10 @@ export default function SiteFooter() {
         <Divider sx={{ my: 4 }} />
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
           <Typography variant="caption" color="text.secondary">
-            © {new Date().getFullYear()} Ceron · Built in Hong Kong · Data residency PDPO aligned
+            {t("footerRights").replace("{year}", String(new Date().getFullYear()))}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            SFC · HKMA · MPFA · IRD compliance gates
+            {t("footerGates")}
           </Typography>
         </Stack>
       </Box>

@@ -85,13 +85,13 @@ export default function NavBar() {
                   logout();
                 }}
               >
-                Log out
+                {t("navLogout")}
               </MenuItem>
             </Menu>
           </>
         ) : (
           <Button component={Link} href="/login" variant="contained" size="small" sx={{ ml: 1 }}>
-            Sign in
+            {t("signIn")}
           </Button>
         )}
       </Toolbar>

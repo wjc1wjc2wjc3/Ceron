@@ -85,7 +85,7 @@ function PreviewSVG({ variant, title }: { variant: "workbench" | "compliance"; t
     return (
       <svg viewBox="0 0 480 300" width="100%" role="img" aria-label={title}>
         {win}
-        <text x="92" y="62" fontSize="14" fontWeight={700} fill="#0d47a1">承保工作台</text>
+        <text x="92" y="62" fontSize="14" fontWeight={700} fill="#0d47a1">{title}</text>
         {[110, 158, 206].map((y, i) => (
           <g key={i}>
             <rect x="92" y={y} width="372" height="40" rx="8" fill="#f7fafd" stroke="#e3e9f0" />
@@ -101,7 +101,7 @@ function PreviewSVG({ variant, title }: { variant: "workbench" | "compliance"; t
   return (
     <svg viewBox="0 0 480 300" width="100%" role="img" aria-label={title}>
       {win}
-      <text x="92" y="62" fontSize="14" fontWeight={700} fill="#0d47a1">合規運營</text>
+      <text x="92" y="62" fontSize="14" fontWeight={700} fill="#0d47a1">{title}</text>
       {[
         { y: 104, c: "#ffcdd2", t: "#c62828" },
         { y: 156, c: "#fff3e0", t: "#ef6c00" },

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 
 export type Locale = "zh-HK" | "en" | "zh-CN";
@@ -122,6 +122,180 @@ const dict: Record<Locale, Record<string, string>> = {
     miAlerts: "未結告警",
     miSarTotal: "SAR 總數",
     generatedAt: "生成時間",
+
+    // ===== 語言切換器 =====
+    langLabel: "語言",
+
+    // ===== 營銷導航 / 頁腳 =====
+    navPlatform: "平台能力",
+    navArchitecture: "系統架構",
+    navOpenConsole: "進入控制台",
+    navLogIn: "登入",
+    navStartFree: "免費開始",
+    footerBlurb: "為香港金融機構打造的承保與合規自動化平台。",
+    footerPlatform: "平台",
+    footerCompliance: "合規",
+    footerCompany: "公司",
+    fProductCaps: "產品能力",
+    fArchitecture: "系統架構",
+    fConsole: "控制台",
+    fMonitoring: "持續監控",
+    fSar: "SAR 申報（JFIU）",
+    fMi: "監管 MI 報表",
+    fGithub: "GitHub",
+    fContact: "聯絡我們",
+    footerRights: "© {year} Ceron · 香港製造 · 資料駐留符合 PDPO",
+    footerGates: "SFC · HKMA · MPFA · IRD 合規閘口",
+
+    // ===== 營銷首頁 =====
+    heroBadge: "從申請到可審計決策",
+    heroTitle: "面向香港金融業的承保自動化",
+    heroSub:
+      "Ceron 讀取每一份申請——電郵、門戶、WhatsApp 或企業微信——對接 ICRIS、土地註冊處、信貸資料庫與制裁名單完成富集，輸出連同 SFC / HKMA / MPFA 合規證據的決策就緒檔案。",
+    heroCta1: "免費開始",
+    heroCta2: "登入控制台",
+    heroNote: "無需信用卡 · 內置模擬數據源 · 資料駐留香港（PDPO）",
+    trustLabel: "為香港金融機構而設",
+    trust1: "保險與經紀",
+    trust2: "信託",
+    trust3: "家族辦公室",
+    trust4: "銀行與強積金",
+    trust5: "證監會持牌資產管理",
+    stat1v: "條業務線專屬抽取模板",
+    stat2v: "類外部數據源統一接入層",
+    stat3v: "種語言覆蓋介面、抽取與決策理由",
+    howLabel: "運作流程",
+    howTitle: "四步從原始申請到可辯護決策",
+    step1k: "收件",
+    step1t: "電郵照常進入",
+    step1d: "轉寄至指定信箱、POST 至我們的 API，或讓經紀使用 WhatsApp / 企業微信，團隊無需改變習慣。",
+    step2k: "抽取",
+    step2t: "雙語文件完成結構化",
+    step2d: "繁中、英文及簡體輸入按業務線專屬欄位解析，結合 OCR 與大模型。",
+    step3k: "富集",
+    step3t: "從真實數據源取證",
+    step3d: "ICRIS 公司查冊、土地註冊處、信貸資料庫、OFAC / HMT 制裁名單、CRS / FATCA——失敗自動降級人工複核。",
+    step4k: "決策",
+    step4t: "有理由的決策，而非一個分數",
+    step4d: "通過 / 拒絕 / 升級人工，附書面理由，並把每個合規閘口記入審計軌跡。",
+    featLabel: "核心能力",
+    featTitle: "香港承保團隊開箱即用的一切",
+    feat1t: "懂中文的文檔智能",
+    feat1d: "處理香港特有文件——保單附表、NAR1、信託契據、強積金記錄——無需維護模板。",
+    feat2t: "管線內置合規閘口",
+    feat2d: "證監會合適性、金管局 LTV / DSR、強積金供款、OFC / LPF 零售投資者檢查，在決策前執行。",
+    feat3t: "統一的數據源集成層",
+    feat3d: "更換供應商不必改動工作流，任一數據源失敗均降級人工複核而非中斷流程。",
+    feat4t: "持續監控而非一次性檢查",
+    feat4d: "定期制裁名單重查與觸發式 re-KYC，讓存量客戶持續受監察。",
+    feat5t: "SAR 申報與監管 MI",
+    feat5d: "可疑交易報告由草稿到提交的狀態機，加上可直接交監管機構的 MI 儀表板。",
+    feat6t: "每個決策都有解釋",
+    feat6d: "欄位級證據、加權理由與三語決策說明，為模型管治而設。",
+    quoteText: "「我們要每個決策都有證據。Ceron 位於漏斗最上游，因為它先處理最重要的數據。」",
+    quoteBy: "營運總監 · 香港家族辦公室",
+    ctaLabel: "數分鐘即可開始",
+    ctaTitle: "親眼見證一份申請變成決策",
+    ctaBtn1: "建立免費帳戶",
+    ctaBtn2: "瀏覽平台能力",
+
+    // ===== 認證 =====
+    authLine1: "收件 → 抽取 → 富集 → 決策",
+    authLine2: "ICRIS · 土地查冊 · 信貸資料庫 · OFAC / HMT · CRS",
+    authLine3: "內置 SFC / HKMA / MPFA 合規閘口",
+    authBackHome: "← 返回 ceron.ai",
+    email: "電郵",
+    password: "密碼",
+    fullName: "姓名",
+    workEmail: "公司電郵",
+    loginKicker: "CERON 控制台",
+    loginTitle: "歡迎回來",
+    loginNewHere: "還沒有帳戶？",
+    loginCreateAccount: "建立帳戶",
+    signIn: "登入",
+    signingIn: "登入中…",
+    loginCodeInstead: "改以電郵驗證碼登入",
+    forgotPassword: "忘記密碼？",
+    orContinue: "或使用以下方式繼續",
+    socialHint: "配置 X / Facebook 憑證後即可使用第三方登入。",
+    socialUnset: "{provider}（未配置）",
+    registerKicker: "開始使用",
+    registerTitle: "建立你的帳戶",
+    registerSub: "從免費沙箱開始——內置模擬數據源。已有帳戶？",
+    createAccount: "建立帳戶",
+    creatingAccount: "建立中…",
+    preferNoPassword: "不想設密碼？",
+    codeSignInLink: "以電郵驗證碼登入",
+    termsNote: "繼續即表示你同意我們的《條款》與《私隱政策》。",
+    forgotKicker: "帳戶恢復",
+    forgotTitle: "忘記密碼？",
+    forgotSub: "輸入你 Ceron 帳戶的電郵，我們會寄出重設連結（30 分鐘內有效）。",
+    sendResetLink: "寄出重設連結",
+    sending: "寄送中…",
+    forgotDone: "若該電郵存在帳戶，重設連結已經寄出。",
+    devModeNoSmtp: "開發模式（未配置 SMTP）——",
+    openResetLink: "開啟重設連結",
+    backTo: "返回",
+    resetKicker: "帳戶恢復",
+    resetTitle: "設定新密碼",
+    resetSub: "請設定至少 8 位字符的密碼，重設連結僅可使用一次。",
+    newPassword: "新密碼",
+    confirmPassword: "確認新密碼",
+    atLeast8: "至少 8 位字符",
+    passwordMismatch: "兩次輸入的密碼不一致。",
+    updatePassword: "更新密碼",
+    updating: "更新中…",
+    resetMissingToken: "此重設連結缺少令牌。",
+    requestNew: "重新申請",
+    codeKicker: "免密碼登入",
+    codeTitleRequest: "以電郵驗證碼登入",
+    codeTitleVerify: "輸入驗證碼",
+    codeSubRequest: "無需密碼——我們會電郵一組一次性驗證碼。全新的電郵？我們會自動為你建立帳戶。",
+    codeSubVerify: "我們已把 6 位驗證碼寄到 {email}，10 分鐘內有效。",
+    codeSent: "驗證碼已寄到你的收件匣。",
+    devCodeHint: "開發模式（未配置 SMTP）——你的驗證碼是",
+    code6: "6 位驗證碼",
+    emailMeCode: "寄驗證碼給我",
+    verifySignIn: "驗證並登入",
+    verifying: "驗證中…",
+    useDifferentEmail: "使用其他電郵",
+    rememberPassword: "記得密碼？",
+    signInPassword: "以密碼登入",
+    navLogout: "登出",
+
+    // ===== AI 模型設置 =====
+    modelsTitle: "AI 模型",
+    modelsSubtitle: "選擇驅動文檔抽取的模型。金鑰只保存在服務端，且僅回傳脫敏值。",
+    modelsActive: "使用中",
+    modelsUse: "選用",
+    modelsTest: "測試連線",
+    modelsTesting: "測試中…",
+    modelsSaveActivate: "儲存並啟用",
+    modelsCustomTitle: "自訂模型（相容 OpenAI）",
+    modelsCustomSub:
+      "把 Ceron 指向任何相容 OpenAI 的端點——內部網關、自建 vLLM 或更新的供應商。請提供模型名稱、Base URL 與 API 金鑰。",
+    modelsNoKey: "未設定金鑰",
+    modelsDisplayName: "顯示名稱",
+    modelsModelName: "模型名稱",
+    modelsBaseUrl: "Base URL",
+    modelsApiKey: "API 金鑰",
+    modelsAddCustom: "新增自訂模型",
+    modelsPhModel: "gpt-4o / llama-3-70b",
+    modelsPhUrl: "https://your-endpoint/v1",
+    modelsNoPresets: "暫無可用預設模型。",
+    modelsApplied: "啟用中的模型會自動套用到你的抽取流程（/v1/pipeline）。",
+    modelsSaved: "模型設定已儲存。",
+    modelsAdded: "自訂模型已新增並啟用。",
+    modelsConnected: "連線成功 · {model}",
+    modelsSavedKey: "已儲存（{mask}）",
+    failed: "失敗",
+
+    // ===== 認證品牌面板（登录/注册共用） =====
+    authQuoteLogin:
+      "我們不再重複錄入申請資料。Ceron 在幾分鐘內就把決策就緒的檔案送回我們的 CRM。",
+    authPersonLogin: "營運主管 · 香港保險經紀",
+    authQuoteRegister: "合規閘口過去躺在一張試算表裡，現在它們在管線裡自動執行。",
+    authPersonRegister: "合規主管 · 中環家族辦公室",
   },
   en: {
     appTitle: "Ceron Console",
@@ -238,6 +412,183 @@ const dict: Record<Locale, Record<string, string>> = {
     miAlerts: "Open alerts",
     miSarTotal: "SARs",
     generatedAt: "Generated",
+
+    // ===== Language switcher =====
+    langLabel: "Language",
+
+    // ===== Marketing nav / footer =====
+    navPlatform: "Platform",
+    navArchitecture: "Architecture",
+    navOpenConsole: "Open console",
+    navLogIn: "Log in",
+    navStartFree: "Start free",
+    footerBlurb: "Underwriting and compliance automation built for Hong Kong financial institutions.",
+    footerPlatform: "Platform",
+    footerCompliance: "Compliance",
+    footerCompany: "Company",
+    fProductCaps: "Product capabilities",
+    fArchitecture: "Architecture",
+    fConsole: "Console",
+    fMonitoring: "Ongoing monitoring",
+    fSar: "SAR filing (JFIU)",
+    fMi: "Regulatory MI",
+    fGithub: "GitHub",
+    fContact: "Contact",
+    footerRights: "© {year} Ceron · Built in Hong Kong · Data residency PDPO aligned",
+    footerGates: "SFC · HKMA · MPFA · IRD compliance gates",
+
+    // ===== Marketing home =====
+    heroBadge: "FROM APPLICATION TO AUDITABLE DECISION",
+    heroTitle: "Underwriting automation for Hong Kong finance",
+    heroSub:
+      "Ceron reads every submission — email, portal, WhatsApp or WeCom — enriches it against ICRIS, Land Registry, credit bureau and sanctions lists, then returns a decision-ready file with SFC / HKMA / MPFA compliance evidence attached.",
+    heroCta1: "Start free",
+    heroCta2: "Sign in to console",
+    heroNote: "No credit card · Mock data sources included · Data residency in Hong Kong (PDPO)",
+    trustLabel: "BUILT FOR HONG KONG FINANCIAL INSTITUTIONS",
+    trust1: "Insurance & brokers",
+    trust2: "Trusts",
+    trust3: "Family offices",
+    trust4: "Banks & MPF",
+    trust5: "SFC-licensed asset managers",
+    stat1v: "verticals with dedicated extraction schemas",
+    stat2v: "external data sources behind one pluggable layer",
+    stat3v: "languages across UI, extraction & decision rationale",
+    howLabel: "HOW IT WORKS",
+    howTitle: "Four steps from raw submission to defensible decision",
+    step1k: "INTAKE",
+    step1t: "Emails come in as usual",
+    step1d: "Forward to a mailbox, POST to our API, or let brokers use WhatsApp / WeCom. No behaviour change for your team.",
+    step2k: "EXTRACT",
+    step2t: "Bilingual documents get structured",
+    step2d: "Traditional Chinese, English and simplified input parsed into vertical-specific fields with OCR + LLM.",
+    step3k: "ENRICH",
+    step3t: "Evidence is pulled from real sources",
+    step3d: "ICRIS company search, Land Registry, credit bureau, OFAC / HMT sanctions, CRS / FATCA — fails safe to manual review.",
+    step4k: "DECIDE",
+    step4t: "A decision with reasons, not a score",
+    step4d: "Approve / reject / escalate with a written rationale and every compliance gate recorded for the audit trail.",
+    featLabel: "CAPABILITIES",
+    featTitle: "Everything a Hong Kong underwriting desk needs, out of the box",
+    feat1t: "Document intelligence that handles Chinese",
+    feat1d: "Handles HK-specific artefacts — policy schedules, NAR1, trust deeds, MPF records — without template maintenance.",
+    feat2t: "Compliance gates inside the pipeline",
+    feat2d: "SFC suitability, HKMA LTV / DSR, MPF contribution and OFC / LPF retail checks run before a decision is issued.",
+    feat3t: "One integration surface for data sources",
+    feat3d: "Swap a provider without touching your workflows. Every source degrades to manual review instead of breaking the run.",
+    feat4t: "Ongoing monitoring, not one-off checks",
+    feat4d: "Periodic sanctions re-screening and triggered re-KYC keep existing clients under continuous review.",
+    feat5t: "SAR filing and regulatory MI",
+    feat5d: "Draft-to-submitted suspicious activity reports plus MI dashboards your compliance team can hand to regulators.",
+    feat6t: "Every decision explained",
+    feat6d: "Field-level evidence, weighted reasons and trilingual rationale — built for model governance.",
+    quoteText:
+      "“We want evidence on every decision. Ceron sits at the top of our funnel because it handles the most important data first.”",
+    quoteBy: "Head of Operations · Hong Kong family office",
+    ctaLabel: "GET STARTED IN MINUTES",
+    ctaTitle: "See a submission become a decision",
+    ctaBtn1: "Create free account",
+    ctaBtn2: "Tour the platform",
+
+    // ===== Auth =====
+    authLine1: "Intake → Extract → Enrich → Decision",
+    authLine2: "ICRIS · Land Search · Credit bureau · OFAC / HMT · CRS",
+    authLine3: "SFC / HKMA / MPFA compliance gates built in",
+    authBackHome: "← Back to ceron.ai",
+    email: "Email",
+    password: "Password",
+    fullName: "Full name",
+    workEmail: "Work email",
+    loginKicker: "CERON CONSOLE",
+    loginTitle: "Welcome back",
+    loginNewHere: "New here?",
+    loginCreateAccount: "Create an account",
+    signIn: "Sign in",
+    signingIn: "Signing in…",
+    loginCodeInstead: "Email me a code instead",
+    forgotPassword: "Forgot password?",
+    orContinue: "or continue with",
+    socialHint: "Social login appears once X / Facebook credentials are configured.",
+    socialUnset: "{provider} (unset)",
+    registerKicker: "GET STARTED",
+    registerTitle: "Create your account",
+    registerSub: "Start with the free sandbox — mock data sources included. Already have an account?",
+    createAccount: "Create account",
+    creatingAccount: "Creating account…",
+    preferNoPassword: "Prefer no password?",
+    codeSignInLink: "Sign in with an email code",
+    termsNote: "By continuing you agree to our Terms and Privacy Policy.",
+    forgotKicker: "ACCOUNT RECOVERY",
+    forgotTitle: "Forgot password?",
+    forgotSub: "Enter the email on your Ceron account and we will send a reset link (valid 30 minutes).",
+    sendResetLink: "Send reset link",
+    sending: "Sending…",
+    forgotDone: "If an account exists for that email, a reset link is on its way.",
+    devModeNoSmtp: "Development mode (no SMTP configured) —",
+    openResetLink: "open the reset link",
+    backTo: "Back to",
+    resetKicker: "ACCOUNT RECOVERY",
+    resetTitle: "Set a new password",
+    resetSub: "Choose a password of at least 8 characters. The reset link is single-use.",
+    newPassword: "New password",
+    confirmPassword: "Confirm password",
+    atLeast8: "At least 8 characters",
+    passwordMismatch: "Passwords do not match.",
+    updatePassword: "Update password",
+    updating: "Updating…",
+    resetMissingToken: "This reset link is missing its token.",
+    requestNew: "Request a new one",
+    codeKicker: "PASSWORDLESS SIGN-IN",
+    codeTitleRequest: "Sign in with email code",
+    codeTitleVerify: "Enter your code",
+    codeSubRequest: "No password needed — we email you a one-time code. New email? We create the account for you.",
+    codeSubVerify: "We sent a 6-digit code to {email}. It expires in 10 minutes.",
+    codeSent: "We sent a 6-digit code to your inbox.",
+    devCodeHint: "Development mode (no SMTP configured) — your code is",
+    code6: "6-digit code",
+    emailMeCode: "Email me a code",
+    verifySignIn: "Verify and sign in",
+    verifying: "Verifying…",
+    useDifferentEmail: "Use a different email",
+    rememberPassword: "Remember your password?",
+    signInPassword: "Sign in with password",
+    navLogout: "Log out",
+
+    // ===== AI model settings =====
+    modelsTitle: "AI models",
+    modelsSubtitle:
+      "Choose which model powers document extraction. Keys are stored server-side and never returned in full — only a masked value is shown back to you.",
+    modelsActive: "Active",
+    modelsUse: "Use",
+    modelsTest: "Test connection",
+    modelsTesting: "Testing…",
+    modelsSaveActivate: "Save & activate",
+    modelsCustomTitle: "Custom models (OpenAI-compatible)",
+    modelsCustomSub:
+      "Point Ceron at any OpenAI-compatible endpoint — internal gateway, self-hosted vLLM, or a newer provider. Provide the model name, base URL and API key.",
+    modelsNoKey: "no key",
+    modelsDisplayName: "Display name",
+    modelsModelName: "Model name",
+    modelsBaseUrl: "Base URL",
+    modelsApiKey: "API key",
+    modelsAddCustom: "Add custom model",
+    modelsPhModel: "gpt-4o / llama-3-70b",
+    modelsPhUrl: "https://your-endpoint/v1",
+    modelsNoPresets: "No presets available.",
+    modelsApplied: "Active model applies to your extraction pipeline automatically (/v1/pipeline).",
+    modelsSaved: "Model settings saved.",
+    modelsAdded: "Custom model added and activated.",
+    modelsConnected: "Connected · {model}",
+    modelsSavedKey: "Saved ({mask})",
+    failed: "failed",
+
+    // ===== Auth brand panel =====
+    authQuoteLogin:
+      "We stopped re-keying applications. Ceron returns a decision-ready file to our CRM in minutes.",
+    authPersonLogin: "Operations Lead · Hong Kong insurance brokerage",
+    authQuoteRegister:
+      "Compliance gates used to live in a spreadsheet. Now they run inside the pipeline.",
+    authPersonRegister: "Head of Compliance · Family office, Central",
   },
   "zh-CN": {
     appTitle: "Ceron 控制台",
@@ -354,6 +705,179 @@ const dict: Record<Locale, Record<string, string>> = {
     miAlerts: "未结告警",
     miSarTotal: "SAR 总数",
     generatedAt: "生成时间",
+
+    // ===== 语言切换器 =====
+    langLabel: "语言",
+
+    // ===== 营销导航 / 页脚 =====
+    navPlatform: "平台能力",
+    navArchitecture: "系统架构",
+    navOpenConsole: "进入控制台",
+    navLogIn: "登录",
+    navStartFree: "免费开始",
+    footerBlurb: "为香港金融机构打造的承保与合规自动化平台。",
+    footerPlatform: "平台",
+    footerCompliance: "合规",
+    footerCompany: "公司",
+    fProductCaps: "产品能力",
+    fArchitecture: "系统架构",
+    fConsole: "控制台",
+    fMonitoring: "持续监控",
+    fSar: "SAR 申报（JFIU）",
+    fMi: "监管 MI 报表",
+    fGithub: "GitHub",
+    fContact: "联系我们",
+    footerRights: "© {year} Ceron · 香港制造 · 数据驻留符合 PDPO",
+    footerGates: "SFC · HKMA · MPFA · IRD 合规闸口",
+
+    // ===== 营销首页 =====
+    heroBadge: "从申请到可审计决策",
+    heroTitle: "面向香港金融业的承保自动化",
+    heroSub:
+      "Ceron 读取每一份申请——邮件、门户、WhatsApp 或企业微信——对接 ICRIS、土地注册处、信贷数据库与制裁名单完成富集，输出连同 SFC / HKMA / MPFA 合规证据的决策就绪档案。",
+    heroCta1: "免费开始",
+    heroCta2: "登录控制台",
+    heroNote: "无需信用卡 · 内置模拟数据源 · 数据驻留香港（PDPO）",
+    trustLabel: "为香港金融机构而设",
+    trust1: "保险与经纪",
+    trust2: "信托",
+    trust3: "家族办公室",
+    trust4: "银行与强积金",
+    trust5: "证监会持牌资产管理",
+    stat1v: "条业务线专属抽取模板",
+    stat2v: "类外部数据源统一接入层",
+    stat3v: "种语言覆盖界面、抽取与决策理由",
+    howLabel: "运作流程",
+    howTitle: "四步从原始申请到可辩护决策",
+    step1k: "收件",
+    step1t: "邮件照常进入",
+    step1d: "转寄到指定邮箱、POST 到我们的 API，或让经纪使用 WhatsApp / 企业微信，团队无需改变习惯。",
+    step2k: "抽取",
+    step2t: "双语文档完成结构化",
+    step2d: "繁中、英文及简体输入按业务线专属字段解析，结合 OCR 与大模型。",
+    step3k: "富集",
+    step3t: "从真实数据源取证",
+    step3d: "ICRIS 公司查册、土地注册处、信贷数据库、OFAC / HMT 制裁名单、CRS / FATCA——失败自动降级人工复核。",
+    step4k: "决策",
+    step4t: "有理由的决策，而非一个分数",
+    step4d: "通过 / 拒绝 / 升级人工，附书面理由，并把每个合规闸口记入审计轨迹。",
+    featLabel: "核心能力",
+    featTitle: "香港承保团队开箱即用的一切",
+    feat1t: "懂中文的文档智能",
+    feat1d: "处理香港特有文件——保单附表、NAR1、信托契据、强积金记录——无需维护模板。",
+    feat2t: "管线内置合规闸口",
+    feat2d: "证监会合适性、金管局 LTV / DSR、强积金供款、OFC / LPF 零售投资者检查，在决策前执行。",
+    feat3t: "统一的数据源集成层",
+    feat3d: "更换供应商不必改动工作流，任一数据源失败均降级人工复核而非中断流程。",
+    feat4t: "持续监控而非一次性检查",
+    feat4d: "定期制裁名单重查与触发式 re-KYC，让存量客户持续受监察。",
+    feat5t: "SAR 申报与监管 MI",
+    feat5d: "可疑交易报告由草稿到提交的状态机，加上可直接交监管机构的 MI 仪表板。",
+    feat6t: "每个决策都有解释",
+    feat6d: "字段级证据、加权理由与三语决策说明，为模型治理而设。",
+    quoteText: "「我们要每个决策都有证据。Ceron 位于漏斗最上游，因为它先处理最重要的数据。」",
+    quoteBy: "运营总监 · 香港家族办公室",
+    ctaLabel: "数分钟即可开始",
+    ctaTitle: "亲眼见证一份申请变成决策",
+    ctaBtn1: "创建免费账户",
+    ctaBtn2: "浏览平台能力",
+
+    // ===== 认证 =====
+    authLine1: "收件 → 抽取 → 富集 → 决策",
+    authLine2: "ICRIS · 土地查册 · 信贷数据库 · OFAC / HMT · CRS",
+    authLine3: "内置 SFC / HKMA / MPFA 合规闸口",
+    authBackHome: "← 返回 ceron.ai",
+    email: "邮箱",
+    password: "密码",
+    fullName: "姓名",
+    workEmail: "公司邮箱",
+    loginKicker: "CERON 控制台",
+    loginTitle: "欢迎回来",
+    loginNewHere: "还没有账户？",
+    loginCreateAccount: "创建账户",
+    signIn: "登录",
+    signingIn: "登录中…",
+    loginCodeInstead: "改用邮箱验证码登录",
+    forgotPassword: "忘记密码？",
+    orContinue: "或使用以下方式继续",
+    socialHint: "配置 X / Facebook 凭证后即可使用第三方登录。",
+    socialUnset: "{provider}（未配置）",
+    registerKicker: "开始使用",
+    registerTitle: "创建你的账户",
+    registerSub: "从免费沙箱开始——内置模拟数据源。已有账户？",
+    createAccount: "创建账户",
+    creatingAccount: "创建中…",
+    preferNoPassword: "不想设密码？",
+    codeSignInLink: "以邮箱验证码登录",
+    termsNote: "继续即表示你同意我们的《条款》与《隐私政策》。",
+    forgotKicker: "账户恢复",
+    forgotTitle: "忘记密码？",
+    forgotSub: "输入你 Ceron 账户的邮箱，我们会寄出重置链接（30 分钟内有效）。",
+    sendResetLink: "寄出重置链接",
+    sending: "寄送中…",
+    forgotDone: "若该邮箱存在账户，重置链接已经寄出。",
+    devModeNoSmtp: "开发模式（未配置 SMTP）——",
+    openResetLink: "打开重置链接",
+    backTo: "返回",
+    resetKicker: "账户恢复",
+    resetTitle: "设置新密码",
+    resetSub: "请设置至少 8 位字符的密码，重置链接仅可使用一次。",
+    newPassword: "新密码",
+    confirmPassword: "确认新密码",
+    atLeast8: "至少 8 位字符",
+    passwordMismatch: "两次输入的密码不一致。",
+    updatePassword: "更新密码",
+    updating: "更新中…",
+    resetMissingToken: "此重置链接缺少令牌。",
+    requestNew: "重新申请",
+    codeKicker: "免密码登录",
+    codeTitleRequest: "以邮箱验证码登录",
+    codeTitleVerify: "输入验证码",
+    codeSubRequest: "无需密码——我们会发送一组一次性验证码。全新的邮箱？我们会自动为你创建账户。",
+    codeSubVerify: "我们已把 6 位验证码寄到 {email}，10 分钟内有效。",
+    codeSent: "验证码已寄到你的收件箱。",
+    devCodeHint: "开发模式（未配置 SMTP）——你的验证码是",
+    code6: "6 位验证码",
+    emailMeCode: "发送验证码",
+    verifySignIn: "验证并登录",
+    verifying: "验证中…",
+    useDifferentEmail: "使用其他邮箱",
+    rememberPassword: "记得密码？",
+    signInPassword: "以密码登录",
+    navLogout: "退出登录",
+
+    // ===== AI 模型设置 =====
+    modelsTitle: "AI 模型",
+    modelsSubtitle: "选择驱动文档抽取的模型。密钥只保存在服务端，且仅回传脱敏值。",
+    modelsActive: "使用中",
+    modelsUse: "选用",
+    modelsTest: "测试连接",
+    modelsTesting: "测试中…",
+    modelsSaveActivate: "保存并启用",
+    modelsCustomTitle: "自定义模型（兼容 OpenAI）",
+    modelsCustomSub:
+      "把 Ceron 指向任何兼容 OpenAI 的端点——内部网关、自建 vLLM 或更新的供应商。请提供模型名称、Base URL 与 API 密钥。",
+    modelsNoKey: "未设置密钥",
+    modelsDisplayName: "显示名称",
+    modelsModelName: "模型名称",
+    modelsBaseUrl: "Base URL",
+    modelsApiKey: "API 密钥",
+    modelsAddCustom: "新增自定义模型",
+    modelsPhModel: "gpt-4o / llama-3-70b",
+    modelsPhUrl: "https://your-endpoint/v1",
+    modelsNoPresets: "暂无可用预设模型。",
+    modelsApplied: "启用中的模型会自动套用到你的抽取流程（/v1/pipeline）。",
+    modelsSaved: "模型设置已保存。",
+    modelsAdded: "自定义模型已新增并启用。",
+    modelsConnected: "连接成功 · {model}",
+    modelsSavedKey: "已保存（{mask}）",
+    failed: "失败",
+
+    // ===== 认证品牌面板 =====
+    authQuoteLogin: "我们不再重复录入申请资料。Ceron 在几分钟内就把决策就绪的档案送回我们的 CRM。",
+    authPersonLogin: "运营主管 · 香港保险经纪",
+    authQuoteRegister: "合规闸口过去躺在一张电子表格里，现在它们在管线里自动执行。",
+    authPersonRegister: "合规主管 · 中环家族办公室",
   },
 };
 
@@ -368,34 +892,74 @@ interface I18nCtx {
   locale: Locale;
   setLocale: (l: Locale) => void;
   t: (key: string) => string;
+  tf: (key: string, vars?: Record<string, string | number>) => string;
 }
 
 const Ctx = createContext<I18nCtx | null>(null);
 
+// SSR 阶段没有 layout effect，客户端用 useLayoutEffect 在绘制前套用已保存语言，避免闪一下默认语言。
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+const LOCALE_KEY = "ceron.locale";
+
+function readSavedLocale(): Locale | null {
+  try {
+    const fromCookie = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith(`${LOCALE_KEY}=`))
+      ?.split("=")[1];
+    // localStorage 为主（每次切换都会同步写入），cookie 仅在 localStorage 不可用（如隐私模式）时兜底。
+    const saved = (localStorage.getItem(LOCALE_KEY) || fromCookie) as Locale | null;
+    return saved && dict[saved] ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("zh-HK");
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("ceron.locale") as Locale | null;
-      if (saved && dict[saved]) setLocaleState(saved);
-    } catch {
-      /* ignore */
-    }
+  useIsomorphicLayoutEffect(() => {
+    const saved = readSavedLocale();
+    if (saved) setLocaleState(saved);
+
+    // 多标签页 / 同页多个 Provider 之间保持一致
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LOCALE_KEY && e.newValue && dict[e.newValue as Locale]) {
+        setLocaleState(e.newValue as Locale);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const setLocale = (l: Locale) => {
     setLocaleState(l);
     try {
-      localStorage.setItem("ceron.locale", l);
+      localStorage.setItem(LOCALE_KEY, l);
+      document.cookie = `${LOCALE_KEY}=${l}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {
       /* ignore */
     }
   };
 
+  // 同步 <html lang>，让浏览器/读屏器与所选语言一致。
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = locale === "zh-CN" ? "zh-Hans" : locale;
+    }
+  }, [locale]);
+
   const t = (key: string) => dict[locale][key] ?? dict["zh-HK"][key] ?? key;
 
-  return <Ctx.Provider value={{ locale, setLocale, t }}>{children}</Ctx.Provider>;
+  // 支持 {var} 占位符：tf("codeSubVerify", { email })
+  const tf = (key: string, vars: Record<string, string | number> = {}) =>
+    Object.entries(vars).reduce(
+      (s, [k, v]) => s.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
+      t(key)
+    );
+
+  return <Ctx.Provider value={{ locale, setLocale, t, tf }}>{children}</Ctx.Provider>;
 }
 
 export function useT(): I18nCtx {
@@ -405,12 +969,12 @@ export function useT(): I18nCtx {
 }
 
 export function LanguageSwitcher() {
-  const { locale, setLocale } = useT();
+  const { locale, setLocale, t } = useT();
   return (
     <FormControl size="small" sx={{ minWidth: 130 }}>
-      <InputLabel>Language</InputLabel>
+      <InputLabel>{t("langLabel")}</InputLabel>
       <Select
-        label="Language"
+        label={t("langLabel")}
         value={locale}
         onChange={(e) => setLocale(e.target.value as Locale)}
       >

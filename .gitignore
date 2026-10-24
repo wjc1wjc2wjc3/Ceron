@@ -16,6 +16,8 @@ out/
 npm-debug.log*
 yarn-error.log*
 dev.log
+.playwright-cli/
+*.tsbuildinfo
 
 # ===== Go build artifacts =====
 ceron-gateway

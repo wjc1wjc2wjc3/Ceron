@@ -10,7 +10,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HubIcon from "@mui/icons-material/Hub";
 import NavBar from "../../../components/NavBar";
 import { useAuth } from "../../../components/AuthProvider";
-import { I18nProvider } from "../../i18n";
+import { I18nProvider, useT } from "../../i18n";
 
 interface Preset {
   id: string;
@@ -56,6 +56,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function ModelsView() {
+  const { t, tf } = useT();
   const { user, loading } = useAuth();
   const [presets, setPresets] = useState<Preset[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -116,7 +117,7 @@ function ModelsView() {
       setSettings(res.settings);
       setActive(res.settings.active || "");
       setKeys({});
-      setToast("Model settings saved.");
+      setToast(t("modelsSaved"));
     } catch (e: any) {
       setToast(e.message);
     } finally {
@@ -139,7 +140,7 @@ function ModelsView() {
       setCustomModel("");
       setCustomUrl("");
       setCustomKey("");
-      setToast("Custom model added and activated.");
+      setToast(t("modelsAdded"));
       await load();
     } catch (e: any) {
       setToast(e.message);
@@ -163,7 +164,11 @@ function ModelsView() {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      setTestResult({ id, ok: r.ok, msg: r.ok ? `Connected · ${r.model}` : r.error || "failed" });
+      setTestResult({
+        id,
+        ok: r.ok,
+        msg: r.ok ? tf("modelsConnected", { model: r.model || "" }) : r.error || t("failed"),
+      });
     } catch (e: any) {
       setTestResult({ id, ok: false, msg: e.message });
     } finally {
@@ -178,11 +183,10 @@ function ModelsView() {
       <NavBar />
       <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
         <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
-          AI models
+          {t("modelsTitle")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          Choose which model powers document extraction. Keys are stored server-side and never
-          returned in full — only a masked value is shown back to you.
+          {t("modelsSubtitle")}
         </Typography>
 
         <Grid container spacing={2}>
@@ -209,28 +213,28 @@ function ModelsView() {
                         </Box>
                       </Stack>
                       {selected ? (
-                        <Chip size="small" color="primary" label="Active" />
+                        <Chip size="small" color="primary" label={t("modelsActive")} />
                       ) : (
                         <Button size="small" onClick={() => { setActive(p.id); save(p.id); }}>
-                          Use
+                          {t("modelsUse")}
                         </Button>
                       )}
                     </Stack>
 
                     <Stack spacing={2} sx={{ mt: 2.5 }}>
                       <TextField
-                        size="small" label="Model" value={models[p.id] || p.default_model}
+                        size="small" label={t("modelsModelName")} value={models[p.id] || p.default_model}
                         onChange={(e) => setModels({ ...models, [p.id]: e.target.value })}
                         fullWidth
                       />
                       <TextField
-                        size="small" label="Base URL" value={urls[p.id] || p.base_url}
+                        size="small" label={t("modelsBaseUrl")} value={urls[p.id] || p.base_url}
                         onChange={(e) => setUrls({ ...urls, [p.id]: e.target.value })}
                         fullWidth
                       />
                       <TextField
-                        size="small" label="API key" type="password"
-                        placeholder={over?.has_key ? `Saved (${over.api_key_masked})` : "sk-…"}
+                        size="small" label={t("modelsApiKey")} type="password"
+                        placeholder={over?.has_key ? tf("modelsSavedKey", { mask: over.api_key_masked }) : "sk-…"}
                         value={keys[p.id] || ""}
                         onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })}
                         fullWidth
@@ -246,11 +250,11 @@ function ModelsView() {
                             api_key: keys[p.id] || "",
                           })}
                         >
-                          {testing === p.id ? "Testing…" : "Test connection"}
+                          {testing === p.id ? t("modelsTesting") : t("modelsTest")}
                         </Button>
                         <Button size="small" variant="contained" disabled={saving}
                           onClick={() => save(p.id)}>
-                          Save & activate
+                          {t("modelsSaveActivate")}
                         </Button>
                       </Stack>
                       {testResult?.id === p.id && (
@@ -267,11 +271,10 @@ function ModelsView() {
         <Divider sx={{ my: 5 }} />
 
         <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-          Custom models (OpenAI-compatible)
+          {t("modelsCustomTitle")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Point Ceron at any OpenAI-compatible endpoint — internal gateway, self-hosted vLLM, or a
-          newer provider. Provide the model name, base URL and API key.
+          {t("modelsCustomSub")}
         </Typography>
 
         {(settings?.customs || []).map((c) => (
@@ -284,14 +287,14 @@ function ModelsView() {
                 <Box>
                   <Typography variant="subtitle1" fontWeight={700}>{c.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {c.model} · {c.base_url} · {c.has_key ? c.api_key_masked : "no key"}
+                    {c.model} · {c.base_url} · {c.has_key ? c.api_key_masked : t("modelsNoKey")}
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  {active === c.id && <Chip size="small" color="primary" label="Active" />}
+                  {active === c.id && <Chip size="small" color="primary" label={t("modelsActive")} />}
                   <Button size="small" disabled={testing === c.id}
                     onClick={() => test(c.id, { custom_id: c.id, base_url: c.base_url, model: c.model, api_key: "" })}>
-                    {testing === c.id ? "Testing…" : "Test"}
+                    {testing === c.id ? t("modelsTesting") : t("modelsTest")}
                   </Button>
                   <Button size="small" onClick={() => {
                     setActive(c.id);
@@ -299,7 +302,7 @@ function ModelsView() {
                       method: "PUT", body: JSON.stringify({ active: c.id }),
                     }).then(load).catch((e) => setToast(e.message));
                   }}>
-                    Activate
+                    {t("modelsUse")}
                   </Button>
                   <IconButton size="small" onClick={() => removeCustom(c.id)}>
                     <DeleteOutlineIcon fontSize="small" />
@@ -317,41 +320,41 @@ function ModelsView() {
           <CardContent>
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
-                <TextField size="small" label="Display name" value={customName} fullWidth
+                <TextField size="small" label={t("modelsDisplayName")} value={customName} fullWidth
                   onChange={(e) => setCustomName(e.target.value)} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField size="small" label="Model name" value={customModel} fullWidth
-                  placeholder="gpt-4o / llama-3-70b"
+                <TextField size="small" label={t("modelsModelName")} value={customModel} fullWidth
+                  placeholder={t("modelsPhModel")}
                   onChange={(e) => setCustomModel(e.target.value)} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField size="small" label="Base URL" value={customUrl} fullWidth
-                  placeholder="https://your-endpoint/v1"
+                <TextField size="small" label={t("modelsBaseUrl")} value={customUrl} fullWidth
+                  placeholder={t("modelsPhUrl")}
                   onChange={(e) => setCustomUrl(e.target.value)} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField size="small" label="API key" type="password" value={customKey} fullWidth
+                <TextField size="small" label={t("modelsApiKey")} type="password" value={customKey} fullWidth
                   onChange={(e) => setCustomKey(e.target.value)} />
               </Grid>
             </Grid>
             <Button sx={{ mt: 2 }} variant="contained"
               disabled={!customModel || !customUrl} onClick={addCustom}>
-              Add custom model
+              {t("modelsAddCustom")}
             </Button>
           </CardContent>
         </Card>
 
         {!presets.length && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-            No presets available.
+            {t("modelsNoPresets")}
           </Typography>
         )}
 
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 4 }}>
           <CheckCircleIcon fontSize="small" sx={{ color: "success.main" }} />
           <Typography variant="caption" color="text.secondary">
-            Active model applies to your extraction pipeline automatically (/v1/pipeline).
+            {t("modelsApplied")}
           </Typography>
         </Stack>
       </Box>

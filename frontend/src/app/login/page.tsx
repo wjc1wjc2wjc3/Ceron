@@ -8,9 +8,10 @@ import {
 } from "@mui/material";
 import AuthBrandPanel from "../../components/AuthBrandPanel";
 import { useAuth } from "../../components/AuthProvider";
-import { I18nProvider, LanguageSwitcher } from "../i18n";
+import { I18nProvider, LanguageSwitcher, useT } from "../i18n";
 
 function LoginForm() {
+  const { t, tf } = useT();
   const { login, providers, user } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
@@ -54,10 +55,7 @@ function LoginForm() {
   return (
     <Grid container sx={{ minHeight: "100vh" }}>
       <Grid item xs={12} md={5}>
-        <AuthBrandPanel
-          quoteKey="We stopped re-keying applications. Ceron returns a decision-ready file to our CRM in minutes."
-          personKey="Operations Lead · Hong Kong insurance brokerage"
-        />
+        <AuthBrandPanel quoteKey="authQuoteLogin" personKey="authPersonLogin" />
       </Grid>
 
       <Grid item xs={12} md={7}>
@@ -69,18 +67,18 @@ function LoginForm() {
         >
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
             <Typography variant="caption" sx={{ letterSpacing: 1.4, fontWeight: 700, color: "text.secondary" }}>
-              CERON CONSOLE
+              {t("loginKicker")}
             </Typography>
             <LanguageSwitcher />
           </Stack>
 
           <Typography variant="h3" sx={{ mb: 1 }}>
-            Welcome back
+            {t("loginTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            New here?{" "}
+            {t("loginNewHere")}{" "}
             <MuiLink component={Link} href="/register" sx={{ color: "#1f4dff", fontWeight: 600 }}>
-              Create an account
+              {t("loginCreateAccount")}
             </MuiLink>
           </Typography>
 
@@ -90,15 +88,15 @@ function LoginForm() {
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2.5}>
               <TextField
-                label="Email" type="email" value={email} required fullWidth autoFocus
+                label={t("email")} type="email" value={email} required fullWidth autoFocus
                 onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
-                label="Password" type="password" value={password} required fullWidth
+                label={t("password")} type="password" value={password} required fullWidth
                 onChange={(e) => setPassword(e.target.value)}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy} fullWidth>
-                {busy ? "Signing in…" : "Sign in"}
+                {busy ? t("signingIn") : t("signIn")}
               </Button>
             </Stack>
           </Box>
@@ -108,33 +106,33 @@ function LoginForm() {
               component={Link} href="/login/code"
               sx={{ fontSize: 13, color: "text.secondary", cursor: "pointer" }}
             >
-              Email me a code instead
+              {t("loginCodeInstead")}
             </MuiLink>
             <MuiLink component={Link} href="/forgot" sx={{ fontSize: 13, color: "#1f4dff", fontWeight: 600 }}>
-              Forgot password?
+              {t("forgotPassword")}
             </MuiLink>
           </Stack>
 
           {/* 第三方登录降为次要选项 */}
           <Divider sx={{ my: 4 }}>
-            <Typography variant="caption" color="text.secondary">or continue with</Typography>
+            <Typography variant="caption" color="text.secondary">{t("orContinue")}</Typography>
           </Divider>
           <Stack direction="row" spacing={1.5}>
             <Button
               fullWidth variant="text" size="small" disabled={!providers.x} onClick={() => social("x")}
               sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
             >
-              {providers.x ? "X" : "X (unset)"}
+              {providers.x ? "X" : tf("socialUnset", { provider: "X" })}
             </Button>
             <Button
               fullWidth variant="text" size="small" disabled={!providers.facebook} onClick={() => social("facebook")}
               sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
             >
-              {providers.facebook ? "Facebook" : "Facebook (unset)"}
+              {providers.facebook ? "Facebook" : tf("socialUnset", { provider: "Facebook" })}
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block", textAlign: "center" }}>
-            Social login appears once X / Facebook credentials are configured.
+            {t("socialHint")}
           </Typography>
         </Box>
       </Grid>

@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { AppBar, Box, Button, Stack, Toolbar, Typography } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
-import { LanguageSwitcher } from "../app/i18n";
+import { LanguageSwitcher, useT } from "../app/i18n";
 import { useAuth } from "./AuthProvider";
-
-const LINKS = [
-  { label: "Platform", href: "/products" },
-  { label: "Architecture", href: "/products#architecture" },
-];
 
 /** 营销页顶部导航（对 herondata.io 的 nav：品牌 + 少量栏目 + 右侧双 CTA）。 */
 export default function MarketingNav() {
+  const { t } = useT();
   const { user } = useAuth();
+
+  const links = [
+    { key: "navPlatform", href: "/products" },
+    { key: "navArchitecture", href: "/products#architecture" },
+  ];
+
   return (
     <AppBar
       position="static"
@@ -34,14 +36,14 @@ export default function MarketingNav() {
           </Stack>
         </Typography>
         <Box sx={{ display: { xs: "none", md: "flex" }, gap: 2, ml: 3 }}>
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Button
               key={l.href}
               component={Link}
               href={l.href}
               sx={{ color: "text.primary", fontWeight: 500 }}
             >
-              {l.label}
+              {t(l.key)}
             </Button>
           ))}
         </Box>
@@ -49,15 +51,15 @@ export default function MarketingNav() {
         <LanguageSwitcher />
         {user ? (
           <Button component={Link} href="/app" variant="contained" sx={{ ml: 1.5 }}>
-            Open console
+            {t("navOpenConsole")}
           </Button>
         ) : (
           <>
             <Button component={Link} href="/login" sx={{ ml: 1.5, color: "text.primary" }}>
-              Log in
+              {t("navLogIn")}
             </Button>
             <Button component={Link} href="/register" variant="contained">
-              Start free
+              {t("navStartFree")}
             </Button>
           </>
         )}

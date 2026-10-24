@@ -6,9 +6,10 @@ import {
   Alert, Box, Button, Link as MuiLink, Stack, TextField, Typography,
 } from "@mui/material";
 import LockResetIcon from "@mui/icons-material/LockReset";
-import { I18nProvider } from "../i18n";
+import { I18nProvider, LanguageSwitcher, useT } from "../i18n";
 
 function ForgotForm() {
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
   const [devLink, setDevLink] = useState("");
@@ -39,27 +40,30 @@ function ForgotForm() {
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 3 }}>
       <Box sx={{ width: "100%", maxWidth: 420 }}>
-        <LockResetIcon sx={{ color: "primary.main", fontSize: 34, mb: 2 }} />
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <LockResetIcon sx={{ color: "primary.main", fontSize: 34 }} />
+          <LanguageSwitcher />
+        </Stack>
         <Typography variant="caption" sx={{ letterSpacing: 1.4, fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
-          ACCOUNT RECOVERY
+          {t("forgotKicker")}
         </Typography>
         <Typography variant="h3" sx={{ mb: 1 }}>
-          Forgot password?
+          {t("forgotTitle")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          Enter the email on your Ceron account and we will send a reset link (valid 30 minutes).
+          {t("forgotSub")}
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
         {done && (
           <>
             <Alert severity="success" sx={{ mb: 3 }}>
-              If an account exists for that email, a reset link is on its way.
+              {t("forgotDone")}
             </Alert>
             {devLink && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                Development mode (no SMTP configured) —{" "}
-                <MuiLink href={devLink} sx={{ fontWeight: 700 }}>open the reset link</MuiLink>
+                {t("devModeNoSmtp")}{" "}
+                <MuiLink href={devLink} sx={{ fontWeight: 700 }}>{t("openResetLink")}</MuiLink>
               </Alert>
             )}
           </>
@@ -69,20 +73,20 @@ function ForgotForm() {
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2.5}>
               <TextField
-                label="Email" type="email" value={email} required fullWidth autoFocus
+                label={t("email")} type="email" value={email} required fullWidth autoFocus
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy} fullWidth>
-                {busy ? "Sending…" : "Send reset link"}
+                {busy ? t("sending") : t("sendResetLink")}
               </Button>
             </Stack>
           </Box>
         )}
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-          Back to{" "}
+          {t("backTo")}{" "}
           <Link href="/login" style={{ color: "#1f4dff", fontWeight: 600 }}>
-            sign in
+            {t("signIn")}
           </Link>
         </Typography>
       </Box>
