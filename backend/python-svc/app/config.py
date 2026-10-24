@@ -72,6 +72,21 @@ class Settings:
     facebook_client_secret: str = os.getenv("FACEBOOK_CLIENT_SECRET", "")
     facebook_redirect_uri: str = os.getenv(
         "FACEBOOK_REDIRECT_URI", f"{public_base_url}/v1/auth/facebook/callback")
+    # 邮箱验证码登录：有效期（秒）与重发间隔（秒）
+    auth_code_ttl: int = int(os.getenv("AUTH_CODE_TTL_SECONDS", "600"))
+    auth_code_resend: int = int(os.getenv("AUTH_CODE_RESEND_SECONDS", "60"))
+    # 密码重置令牌有效期（秒）
+    auth_reset_ttl: int = int(os.getenv("AUTH_RESET_TTL_SECONDS", "1800"))
+    # ===== 邮件（验证码登录 / 重置密码）=====
+    # 未配置 SMTP_HOST 时不真实发信：内容打印到服务日志并可回显调试值
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_pass: str = os.getenv("SMTP_PASS", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "")
+    smtp_use_ssl: bool = str(os.getenv("SMTP_USE_SSL", "false")).lower() == "true"
+    # 开发环境：SMTP 未配置时把验证码/重置链接回显到 API 响应（生产务必关闭）
+    dev_echo_secret: bool = str(os.getenv("DEV_ECHO_SECRET", "true")).lower() == "true"
 
 
 settings = Settings()

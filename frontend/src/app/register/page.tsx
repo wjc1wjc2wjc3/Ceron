@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Divider, Grid, Stack, TextField, Typography,
+  Alert, Box, Button, Divider, Grid, Link as MuiLink, Stack, TextField, Typography,
 } from "@mui/material";
 import AuthBrandPanel from "../../components/AuthBrandPanel";
 import { useAuth } from "../../components/AuthProvider";
@@ -84,28 +84,12 @@ function RegisterForm() {
 
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-          <Stack spacing={2} sx={{ mb: 3 }}>
-            <Button
-              fullWidth variant="outlined" disabled={!providers.x} onClick={() => social("x")}
-              sx={{ textTransform: "none", color: "text.primary", borderColor: "divider" }}
-            >
-              {providers.x ? "Continue with X" : "Continue with X (not configured)"}
-            </Button>
-            <Button
-              fullWidth variant="outlined" disabled={!providers.facebook} onClick={() => social("facebook")}
-              sx={{ textTransform: "none", color: "text.primary", borderColor: "divider" }}
-            >
-              {providers.facebook ? "Continue with Facebook" : "Continue with Facebook (not configured)"}
-            </Button>
-          </Stack>
-
-          <Divider sx={{ mb: 3 }}>or</Divider>
-
+          {/* 邮箱注册：主路径，放在最上方 */}
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2.5}>
               <TextField label="Full name" value={name} fullWidth onChange={(e) => setName(e.target.value)} />
               <TextField
-                label="Work email" type="email" value={email} required fullWidth
+                label="Work email" type="email" value={email} required fullWidth autoFocus
                 onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
@@ -119,7 +103,33 @@ function RegisterForm() {
             </Stack>
           </Box>
 
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 3, display: "block" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontSize: 13 }}>
+            Prefer no password?{" "}
+            <MuiLink component={Link} href="/login/code" sx={{ color: "#1f4dff", fontWeight: 600, fontSize: 13 }}>
+              Sign in with an email code
+            </MuiLink>
+          </Typography>
+
+          {/* 第三方登录降为次要选项 */}
+          <Divider sx={{ my: 4 }}>
+            <Typography variant="caption" color="text.secondary">or continue with</Typography>
+          </Divider>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              fullWidth variant="text" size="small" disabled={!providers.x} onClick={() => social("x")}
+              sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
+            >
+              {providers.x ? "X" : "X (unset)"}
+            </Button>
+            <Button
+              fullWidth variant="text" size="small" disabled={!providers.facebook} onClick={() => social("facebook")}
+              sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
+            >
+              {providers.facebook ? "Facebook" : "Facebook (unset)"}
+            </Button>
+          </Stack>
+
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 4, display: "block" }}>
             By continuing you agree to our Terms and Privacy Policy.
           </Typography>
         </Box>

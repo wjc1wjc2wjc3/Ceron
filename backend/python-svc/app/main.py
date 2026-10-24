@@ -187,6 +187,26 @@ class LoginReq(BaseModel):
     password: str
 
 
+class EmailCodeReq(BaseModel):
+    email: str
+    purpose: str = "login"
+
+
+class VerifyCodeReq(BaseModel):
+    email: str
+    code: str
+    name: str = ""
+
+
+class ForgotReq(BaseModel):
+    email: str
+
+
+class ResetReq(BaseModel):
+    token: str
+    new_password: str
+
+
 def _token_from_header(authorization: Optional[str]) -> Optional[str]:
     """接受 `Bearer <token>` 或裸 token 两种写法。"""
     if not authorization:
@@ -232,6 +252,49 @@ def auth_me(authorization: Optional[str] = Header(None)):
 @app.post("/v1/auth/logout")
 def auth_logout():
     """无状态 JWT：服务端无需处理，客户端丢弃令牌即可。"""
+    return {"ok": True}
+
+
+@app.post("/v1/auth/email/code")
+def auth_email_code(req: EmailCodeReq):
+    """邮箱验证码：向邮箱发送 6 位验证码（未注册等同注册，验证码登录即账号开通）。"""
+    try:
+        wait, echo = auth.request_email_code(req.email, req.purpose)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    body = {"sent": True, "resend_wait": wait}
+    if echo:  # 开发环境回显，生产（配置了 SMTP）不会返回
+        body["dev_code"] = echo
+    return body
+
+
+@app.post("/v1/auth/email/verify")
+def auth_email_verify(req: VerifyCodeReq):
+    try:
+        user = auth.verify_email_code(req.email, req.code, req.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return auth.issue(user)
+
+
+@app.post("/v1/auth/password/forgot")
+def auth_password_forgot(req: ForgotReq):
+    """发起密码重置。无论邮箱是否存在都返回成功，避免账号枚举。"""
+    echo = auth.start_password_reset(req.email)
+    body = {"ok": True}
+    if echo:
+        body["dev_link"] = echo
+    return body
+
+
+@app.post("/v1/auth/password/reset")
+def auth_password_reset(req: ResetReq):
+    try:
+        done = auth.complete_password_reset(req.token, req.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not done:
+        raise HTTPException(status_code=400, detail="token_invalid_or_expired")
     return {"ok": True}
 
 

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Divider, Grid, Stack, TextField, Typography,
+  Alert, Box, Button, Divider, Grid, Link as MuiLink, Stack, TextField, Typography,
 } from "@mui/material";
 import AuthBrandPanel from "../../components/AuthBrandPanel";
 import { useAuth } from "../../components/AuthProvider";
@@ -13,14 +13,17 @@ import { I18nProvider, LanguageSwitcher } from "../i18n";
 function LoginForm() {
   const { login, providers, user } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+  const next = params.get("next") || "/app";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) router.replace("/app");
-  }, [user, router]);
+    if (user) router.replace(next);
+  }, [user, router, next]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +31,7 @@ function LoginForm() {
     setError("");
     try {
       await login(email, password);
-      router.replace("/app");
+      router.replace(next);
     } catch (err: any) {
       setError(err?.message || "login_failed");
     } finally {
@@ -60,7 +63,7 @@ function LoginForm() {
       <Grid item xs={12} md={7}>
         <Box
           sx={{
-            p: { xs: 3, md: 6 }, maxWidth: 480, mx: "auto", height: "100%",
+            p: { xs: 3, md: 6 }, maxWidth: 460, mx: "auto", height: "100%",
             display: "flex", flexDirection: "column", justifyContent: "center",
           }}
         >
@@ -75,35 +78,19 @@ function LoginForm() {
             Welcome back
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            Sign in to your underwriting workspace. New here?{" "}
-            <Link href="/register" style={{ color: "#1f4dff", fontWeight: 600 }}>
+            New here?{" "}
+            <MuiLink component={Link} href="/register" sx={{ color: "#1f4dff", fontWeight: 600 }}>
               Create an account
-            </Link>
+            </MuiLink>
           </Typography>
 
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-          <Stack spacing={2} sx={{ mb: 3 }}>
-            <Button
-              fullWidth variant="outlined" disabled={!providers.x} onClick={() => social("x")}
-              sx={{ textTransform: "none", color: "text.primary", borderColor: "divider" }}
-            >
-              {providers.x ? "Continue with X" : "Continue with X (not configured)"}
-            </Button>
-            <Button
-              fullWidth variant="outlined" disabled={!providers.facebook} onClick={() => social("facebook")}
-              sx={{ textTransform: "none", color: "text.primary", borderColor: "divider" }}
-            >
-              {providers.facebook ? "Continue with Facebook" : "Continue with Facebook (not configured)"}
-            </Button>
-          </Stack>
-
-          <Divider sx={{ mb: 3 }}>or</Divider>
-
+          {/* 邮箱密码登录：主路径，放在最上方 */}
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2.5}>
               <TextField
-                label="Email" type="email" value={email} required fullWidth
+                label="Email" type="email" value={email} required fullWidth autoFocus
                 onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
@@ -115,16 +102,58 @@ function LoginForm() {
               </Button>
             </Stack>
           </Box>
+
+          <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
+            <MuiLink
+              component={Link} href="/login/code"
+              sx={{ fontSize: 13, color: "text.secondary", cursor: "pointer" }}
+            >
+              Email me a code instead
+            </MuiLink>
+            <MuiLink component={Link} href="/forgot" sx={{ fontSize: 13, color: "#1f4dff", fontWeight: 600 }}>
+              Forgot password?
+            </MuiLink>
+          </Stack>
+
+          {/* 第三方登录降为次要选项 */}
+          <Divider sx={{ my: 4 }}>
+            <Typography variant="caption" color="text.secondary">or continue with</Typography>
+          </Divider>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              fullWidth variant="text" size="small" disabled={!providers.x} onClick={() => social("x")}
+              sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
+            >
+              {providers.x ? "X" : "X (unset)"}
+            </Button>
+            <Button
+              fullWidth variant="text" size="small" disabled={!providers.facebook} onClick={() => social("facebook")}
+              sx={{ color: "text.secondary", border: 1, borderColor: "divider", borderRadius: 999 }}
+            >
+              {providers.facebook ? "Facebook" : "Facebook (unset)"}
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: "block", textAlign: "center" }}>
+            Social login appears once X / Facebook credentials are configured.
+          </Typography>
         </Box>
       </Grid>
     </Grid>
   );
 }
 
+function LoginInner() {
+  return (
+    <Suspense fallback={<Box sx={{ minHeight: "100vh" }} />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
 export default function LoginPage() {
   return (
     <I18nProvider>
-      <LoginForm />
+      <LoginInner />
     </I18nProvider>
   );
 }

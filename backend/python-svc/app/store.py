@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_provider_uidx
   ON users(provider, provider_id) WHERE provider_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS email_codes (
+  id         TEXT PRIMARY KEY,
+  email      TEXT NOT NULL,
+  purpose    TEXT NOT NULL DEFAULT 'login',
+  code_hash  TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed   BOOLEAN NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed   BOOLEAN NOT NULL DEFAULT false
+);
 """
 
 
@@ -262,6 +276,88 @@ class PostgresBackend:
                 "provider": r[4], "provider_id": r[5], "created_at": _iso(r[6])}
 
 
+    # --- 邮箱验证码 / 密码重置 ---
+    def add_email_code(self, rec: dict) -> None:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO email_codes (id, email, purpose, code_hash, expires_at) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (rec["id"], rec["email"], rec["purpose"], rec["code_hash"], rec["expires_at"]),
+            )
+
+    def live_email_codes(self, email: str, purpose: str) -> list[dict]:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, email, purpose, code_hash, expires_at FROM email_codes "
+                "WHERE email = %s AND purpose = %s AND consumed = false", (email, purpose))
+            rows = cur.fetchall()
+        now = datetime.now(timezone.utc)
+        out = []
+        for r in rows:
+            exp = r[4]
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < now:
+                continue
+            out.append({"id": r[0], "email": r[1], "purpose": r[2], "code_hash": r[3], "exp": exp})
+        return out
+
+    def consume_email_code(self, code_id: str) -> None:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE email_codes SET consumed = true WHERE id = %s", (code_id,))
+
+    def add_password_reset(self, rec: dict) -> None:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (%s, %s, %s)",
+                (rec["token_hash"], rec["user_id"], rec["expires_at"]),
+            )
+
+    def take_password_reset(self, token_hash: str):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id, expires_at FROM password_resets "
+                        "WHERE token_hash = %s AND consumed = false", (token_hash,))
+            r = cur.fetchone()
+            if not r:
+                return None
+            exp = r[1]
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < datetime.now(timezone.utc):
+                return None
+            cur.execute("UPDATE password_resets SET consumed = true WHERE token_hash = %s",
+                        (token_hash,))
+        return {"user_id": r[0]}
+
+    def pending_password_resets(self) -> list[dict]:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT token_hash, user_id, expires_at FROM password_resets "
+                        "WHERE consumed = false")
+            rows = cur.fetchall()
+        now = datetime.now(timezone.utc)
+        out = []
+        for r in rows:
+            exp = r[2]
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < now:
+                continue
+            out.append({"token_hash": r[0], "user_id": r[1]})
+        return out
+
+    def set_password_hash(self, user_id: str, password_hash: str) -> None:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                        (password_hash, user_id))
+
+
 def _create_backend() -> Optional[PostgresBackend]:
     url = getattr(settings, "database_url", "") or os.getenv("DATABASE_URL", "")
     if not url:
@@ -402,3 +498,68 @@ def get_user_by_id(user_id: str) -> Optional[dict]:
         return _pg.get_user_by_id(user_id)
     with _lock:
         return _users.get(user_id)
+
+
+def set_password_hash(user_id: str, password_hash: str) -> None:
+    if _pg is not None:
+        _pg.set_password_hash(user_id, password_hash)
+        return
+    with _lock:
+        if user_id in _users:
+            _users[user_id]["password_hash"] = password_hash
+
+
+# ============ 邮箱验证码 / 密码重置（登录与找回 password）============
+_email_codes: list[dict] = []
+_password_resets: list[dict] = []
+
+
+def add_email_code(rec: dict) -> None:
+    if _pg is not None:
+        _pg.add_email_code(rec)
+        return
+    with _lock:
+        _email_codes.append(rec)
+
+
+def live_email_codes(email: str, purpose: str) -> list[dict]:
+    if _pg is not None:
+        return _pg.live_email_codes(email, purpose)
+    with _lock:
+        now = datetime.now(timezone.utc)
+        return [
+            c for c in _email_codes
+            if c["email"] == email and c["purpose"] == purpose
+            and not c["consumed"] and datetime.fromisoformat(c["expires_at"]) > now
+        ]
+
+
+def consume_email_code(code_id: str) -> None:
+    if _pg is not None:
+        _pg.consume_email_code(code_id)
+        return
+    with _lock:
+        for c in _email_codes:
+            if c["id"] == code_id:
+                c["consumed"] = True
+
+
+def add_password_reset(rec: dict) -> None:
+    if _pg is not None:
+        _pg.add_password_reset(rec)
+        return
+    with _lock:
+        _password_resets.append(rec)
+
+
+def take_password_reset(token_hash: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.take_password_reset(token_hash)
+    with _lock:
+        now = datetime.now(timezone.utc)
+        for p in _password_resets:
+            if p["token_hash"] == token_hash and not p["consumed"] \
+                    and datetime.fromisoformat(p["expires_at"]) > now:
+                p["consumed"] = True
+                return {"user_id": p["user_id"]}
+        return None

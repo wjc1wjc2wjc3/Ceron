@@ -17,11 +17,12 @@ import json
 import secrets
 import time
 import urllib.parse
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Iterator, Optional
 
 import httpx
 
-from app import store
+from app import mailer, store
 from app.config import settings
 
 PBKDF2_ITER = 120_000
@@ -259,5 +260,120 @@ async def facebook_callback(code: str, state: str) -> dict:
 
 
 def configured_providers() -> dict:
-    return {"email": True, "x": bool(settings.x_client_id),
+    return {"email": True, "email_code": True, "x": bool(settings.x_client_id),
             "facebook": bool(settings.facebook_client_id)}
+
+
+# ============ 邮箱验证码注册 / 登录 ============
+_last_code_sent: dict[str, float] = {}
+
+
+def request_email_code(email: str, purpose: str = "login") -> tuple[int, Optional[str]]:
+    """发放并发送 6 位验证码。返回 (重发等待剩余秒数, 开发环境回显的验证码)。
+
+    重发间隔用于防止短信/邮件轰炸；验证码以哈希存储，10 分钟后失效且一次性使用。
+    """
+    import secrets as _sec
+
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        raise ValueError("email_invalid")
+    if purpose not in ("login", "signup"):
+        raise ValueError("purpose_invalid")
+
+    wait = 0
+    last = _last_code_sent.get(email, 0)
+    elapsed = time.time() - last
+    if elapsed < settings.auth_code_resend:
+        wait = int(settings.auth_code_resend - elapsed)
+        return wait, None
+
+    code = f"{_sec.randbelow(10**6):06d}"
+    rec = {
+        "id": f"c-{_sec.token_hex(8)}",
+        "email": email,
+        "purpose": purpose,
+        "code_hash": hash_password(code),  # 验证码同样哈希存储，不落明文
+        # ISO 时间戳便于 Postgres TIMESTAMPTZ 与内存路径共用
+        "expires_at": datetime.fromtimestamp(
+            time.time() + settings.auth_code_ttl, timezone.utc).isoformat(),
+        "consumed": False,
+    }
+    store.add_email_code(rec)
+    _last_code_sent[email] = time.time()
+    echo = mailer.send_code(email, code)
+    return 0, echo
+
+
+def verify_email_code(email: str, code: str, name: str = "") -> dict:
+    """校验验证码并签发会话；邮箱未注册时即视为注册（免密码）。"""
+    email = (email or "").strip().lower()
+    candidates = store.live_email_codes(email, "login") or []
+    found = None
+    for c in candidates:
+        if verify_password(code, c["code_hash"]):
+            found = c
+            break
+    if not found:
+        raise ValueError("code_invalid")
+    store.consume_email_code(found["id"])
+
+    user = store.get_user_by_email(email)
+    if not user:
+        user = {
+            "id": f"u-{secrets.token_hex(8)}",
+            "email": email,
+            "password_hash": None,
+            "name": name or email.split("@")[0],
+            "provider": "email",
+            "provider_id": None,
+            "created_at": store.now_iso(),
+        }
+        store.create_user(user)
+    return user
+
+
+# ============ 忘记密码 / 重置密码 ============
+def start_password_reset(email: str) -> Optional[str]:
+    """发起重置。邮箱不存在也返回成功（避免账号枚举），但不会真的发信。"""
+    email = (email or "").strip().lower()
+    user = store.get_user_by_email(email)
+    if not user:
+        return None
+    token = secrets.token_urlsafe(32)
+    token_hash = hash_password(token)
+    rec = {
+        "token_hash": token_hash,
+        "user_id": user["id"],
+        "expires_at": datetime.fromtimestamp(
+            time.time() + settings.auth_reset_ttl, timezone.utc).isoformat(),
+        "consumed": False,
+    }
+    store.add_password_reset(rec)
+    return mailer.send_reset_link(email, token)
+
+
+def complete_password_reset(token: str, new_password: str) -> bool:
+    """校验重置令牌并写入新密码。令牌一次性：命中后立即置为已消费。"""
+    if len(new_password or "") < 8:
+        raise ValueError("password_too_short")
+    for cand in _pending_reset_tokens():
+        if verify_password(token, cand["token_hash"]):
+            rec = store.take_password_reset(cand["token_hash"])  # 原子置 consumed
+            if not rec:  # 并发下已被消费或刚过期
+                return False
+            store.set_password_hash(rec["user_id"], hash_password(new_password))
+            return True
+    return False
+
+
+def _pending_reset_tokens() -> list[dict]:
+    """返回仍未消费的重置记录（内存 / Postgres 共用视图）。"""
+    if store._pg is not None:
+        return store._pg.pending_password_resets()
+    now = datetime.now(timezone.utc)
+    return [
+        {"token_hash": p["token_hash"], "user_id": p["user_id"]}
+        for p in store._password_resets
+        if not p["consumed"] and datetime.fromisoformat(p["expires_at"]) > now
+    ]
