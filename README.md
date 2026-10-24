@@ -156,14 +156,3 @@ cd backend/python-svc && py poc/bilingual_poc.py
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 运维：拓扑与健康检查、日志、监控、升级回滚、配置变更、**文档同步策略** |
 
 > **文档同步策略**：接口/配置/服务/验证状态发生变化时，必须同步更新 README、`.env.example` 与 docs/（详见 OPERATIONS.md §7）。
-
----
-
-## 已验证
-- `pytest`（backend/python-svc）：**12/12 通过**（脱敏、繁中/英正则、OCR mock、富集 Provider 含 ICRIS/制裁真实路径桩测试、family_office 流水线）。
-- 双语 PoC（真实 DeepSeek）：繁中保险 / 英文保险 / 家族办公室三组样本 **21/21 字段命中（100%）**（密钥按进程注入，未入库）。
-- `go build ./...` 与 `go vet ./...` 全部通过；`go test ./...` 通过（orchestrator 持久化/异步单测）。
-- 前端：Next.js 控制台已落地（文档提交、抽取/富集/决策结果展示、作业审批看板），`npm install` + `npm run build` 通过。
-- 持久化：作业表 Postgres（JSONB）+ NATS JetStream 异步队列已接入，经 build tag `postgres`/`nats` 启用；默认构建零外部依赖、走内存兜底。详见 `docs/DEPLOYMENT.md` §3.4/§6.6。
-- 审批持久化：`PATCH /v1/jobs/{id}/review` 落库（含审批人/时间审计），看板支持状态筛选与分页（服务端 `GET /v1/jobs?status=&limit=&offset=`）。
-- 富集端到端：ICRIS/制裁名单 Provider 配置即真实调用、失败自动降级（桩测试覆盖真实 HTTP 路径）；`py poc/e2e_enrichment.py` 可跑通 抽取→富集→决策。
