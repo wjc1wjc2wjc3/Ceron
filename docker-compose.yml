@@ -1,0 +1,33 @@
+services:
+  python-svc:
+    build:
+      context: ./backend/python-svc
+      dockerfile: Dockerfile
+    environment:
+      - LLM_PROVIDER=mock
+      - DATA_REGION=hk
+    ports:
+      - "8000:8000"
+
+  go-svc:
+    build:
+      context: ./backend/go-svc
+      dockerfile: Dockerfile
+    environment:
+      - PYTHON_SVC_URL=http://python-svc:8000
+      - GO_SVC_PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - python-svc
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - API_BASE=http://go-svc:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - go-svc

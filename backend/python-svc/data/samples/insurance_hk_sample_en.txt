@@ -1,0 +1,12 @@
+Policy No: HK9876543
+Policyholder: Pacific Rich Ltd
+Insured: Chan Tai Man
+Beneficiary: Wong Siu Ming
+Product: Whole Life Insurance
+Sum Insured: HKD 8,000,000
+Annual Premium: HKD 200,000
+Claim Type: Death
+Claim Amount: HKD 1,200,000
+Date of Loss: 2026-09-30
+Completeness: 0.9
+KYC Status: Completed
