@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-pytest%2034%20pass-brightgreen)
+![Tests](https://img.shields.io/badge/tests-pytest%2048%20pass-brightgreen)
 
 > **English**: Ceron is an underwriting & compliance automation platform for Hong Kong financial institutions (insurance, trusts, family offices) — multi-channel intake (API / WhatsApp / WeCom), bilingual document extraction, pluggable data enrichment (ICRIS / Land Search / credit bureau / OFAC / HMT / CRS), decisioning with SFC/HKMA/MPFA compliance gates, ongoing monitoring, SAR filing and regulatory MI reporting.
 
@@ -69,6 +69,36 @@ Ceron 定位为面向香港**中小企业金融与保险业**的**承保（under
 - **优先级 3（长线，已实现）**：持续监控（触发式 re-KYC + 后台周期性重查制裁/OFAC/HMT，命中生成告警）+ SAR 申报（JFIU，草稿→已提交状态机）+ 监管 MI 报表（`/py/v1/mi` 聚合决策/告警/SAR）。前端新增「合规运营」页签整合三者。
 
 ---
+
+## 登录注册与控制台鉴权
+
+- **路由**：`/` 为营销落地页（公开），`/products` 为产品与架构（公开），
+  **`/app`（承保工作台）与 `/app/compliance`（合规运营）需登录**。
+- **注册登录**：邮箱 + 密码（`AUTH_TOKEN_TTL_SECONDS` 控制会话时长）；密码以
+  **PBKDF2-HMAC-SHA256**（随机盐 + 12 万次迭代）存储，会话为 **HS256 签名令牌**，
+  两者均由标准库实现，未引入第三方鉴权依赖。
+- **X / Facebook 登录**：配置对应 App 凭证后，`/v1/auth/providers` 返回可用项，
+  登录页自动显示「Continue with X / Facebook」按钮（未配置则按钮停用，不会撞到 500）。
+  X 走 OAuth 2.0 **PKCE**（S256），两者均校验 `state`（10 分钟有效期）防 CSRF。
+- **守卫**：`frontend/src/middleware.ts` 在**服务端**用 Web Crypto 校验令牌签名与
+  过期时间——伪造 cookie 也会被拦下重定向到 `/login`。
+
+```dotenv
+# python-svc（后端签发令牌）
+AUTH_SECRET=change-me-in-production
+PUBLIC_BASE_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+X_CLIENT_ID=            # developer.x.com 创建 App
+X_CLIENT_SECRET=
+FACEBOOK_CLIENT_ID=     # developers.facebook.com 创建 App
+FACEBOOK_CLIENT_SECRET=
+
+# frontend/.env.local（中间件校验令牌，必须与后端 AUTH_SECRET 一致）
+AUTH_SECRET=change-me-in-production
+```
+
+> 提示：未拿到 X / Facebook 应用审批前，可先用邮箱注册（`http://localhost:3000/register`）
+> 完整体验控制台；社交登录一旦填入凭证即可自动生效。
 
 ## 数据源真实接入示例（ICRIS / 信贷局）
 

@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AppBar, Box, Button, Chip, Toolbar, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import {
+  AppBar, Box, Button, Chip, IconButton, Menu, MenuItem, Toolbar, Typography,
+} from "@mui/material";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { LanguageSwitcher, useT } from "../app/i18n";
+import { useAuth } from "./AuthProvider";
 
 const LINKS = [
-  { href: "/", key: "navWorkspace" },
-  { href: "/compliance", key: "navCompliance" },
+  { href: "/app", key: "navWorkspace" },
+  { href: "/app/compliance", key: "navCompliance" },
   { href: "/products", key: "navProducts" },
 ];
 
 export default function NavBar() {
   const { t } = useT();
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   const [health, setHealth] = useState<any>(null);
+  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/health")
@@ -35,7 +41,7 @@ export default function NavBar() {
         <Typography
           variant="h6"
           component={Link}
-          href="/"
+          href="/app"
           sx={{ textDecoration: "none", color: "primary.main", fontWeight: 700, mr: 2 }}
         >
           Ceron
@@ -48,10 +54,7 @@ export default function NavBar() {
                 key={l.href}
                 component={Link}
                 href={l.href}
-                sx={{
-                  color: active ? "primary.main" : "text.primary",
-                  fontWeight: active ? 700 : 400,
-                }}
+                sx={{ color: active ? "primary.main" : "text.primary", fontWeight: active ? 700 : 400 }}
               >
                 {t(l.key)}
               </Button>
@@ -66,6 +69,30 @@ export default function NavBar() {
           sx={{ mr: 2 }}
         />
         <LanguageSwitcher />
+        {user ? (
+          <>
+            <IconButton size="small" onClick={(e) => setAnchor(e.currentTarget)} sx={{ ml: 1 }}>
+              <AccountCircleIcon />
+            </IconButton>
+            <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+              <MenuItem disabled sx={{ fontSize: 13, color: "text.secondary" }}>
+                {user.email}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setAnchor(null);
+                  logout();
+                }}
+              >
+                Log out
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          <Button component={Link} href="/login" variant="contained" size="small" sx={{ ml: 1 }}>
+            Sign in
+          </Button>
+        )}
       </Toolbar>
     </AppBar>
   );

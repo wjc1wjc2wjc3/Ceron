@@ -56,6 +56,22 @@ class Settings:
     # 配置 DATABASE_URL 即切到 Postgres（JSONB 持久化）；未配置/连接失败回退内存。
     # 建议与 go-svc 共用同一实例，使 Go 看板与 Python 决策历史落在同一 jobs 表。
     database_url: str = os.getenv("DATABASE_URL", "")
+    # ===== 认证（Auth：邮箱密码 + X / Facebook 第三方登录）=====
+    # 会话令牌签名密钥（生产务必更换；须与前端 AUTH_SECRET 一致，便于 Next 校验会话）
+    auth_secret: str = os.getenv("AUTH_SECRET", "ceron-dev-secret-change-me")
+    auth_token_ttl: int = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", str(7 * 24 * 3600)))
+    # 前后端地址：OAuth 回调需要外网可达的绝对 URL
+    public_base_url: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    # X (Twitter) OAuth 2.0 App；配置 X_CLIENT_ID 即启用「使用 X 登录」
+    x_client_id: str = os.getenv("X_CLIENT_ID", "")
+    x_client_secret: str = os.getenv("X_CLIENT_SECRET", "")
+    x_redirect_uri: str = os.getenv("X_REDIRECT_URI", f"{public_base_url}/v1/auth/x/callback")
+    # Facebook 登录
+    facebook_client_id: str = os.getenv("FACEBOOK_CLIENT_ID", "")
+    facebook_client_secret: str = os.getenv("FACEBOOK_CLIENT_SECRET", "")
+    facebook_redirect_uri: str = os.getenv(
+        "FACEBOOK_REDIRECT_URI", f"{public_base_url}/v1/auth/facebook/callback")
 
 
 settings = Settings()

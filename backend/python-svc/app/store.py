@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS sars (
   status  TEXT NOT NULL DEFAULT 'draft',
   payload JSONB
 );
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
+  name          TEXT NOT NULL DEFAULT '',
+  provider      TEXT NOT NULL DEFAULT 'email',
+  provider_id   TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS users_provider_uidx
+  ON users(provider, provider_id) WHERE provider_id IS NOT NULL;
 """
 
 
@@ -206,6 +217,51 @@ class PostgresBackend:
         return {"id": r[0], "ts": _iso(r[1]), "status": r[2], **(r[3] or {})}
 
 
+    # --- 用户 ---
+    def create_user(self, user: dict) -> dict:
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO users (id, email, password_hash, name, provider, provider_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                (user["id"], user["email"], user.get("password_hash"), user.get("name", ""),
+                 user.get("provider", "email"), user.get("provider_id")),
+            )
+        return user
+
+    def get_user_by_email(self, email: str):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
+                        "FROM users WHERE email = %s", (email,))
+            r = cur.fetchone()
+        return self._row_to_user(r) if r else None
+
+    def get_user_by_provider(self, provider: str, provider_id: str):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
+                        "FROM users WHERE provider = %s AND provider_id = %s", (provider, provider_id))
+            r = cur.fetchone()
+        return self._row_to_user(r) if r else None
+
+    def get_user_by_id(self, user_id: str):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
+                        "FROM users WHERE id = %s", (user_id,))
+            r = cur.fetchone()
+        return self._row_to_user(r) if r else None
+
+    @staticmethod
+    def _row_to_user(r) -> dict:
+        return {"id": r[0], "email": r[1], "password_hash": r[2], "name": r[3],
+                "provider": r[4], "provider_id": r[5], "created_at": _iso(r[6])}
+
+
 def _create_backend() -> Optional[PostgresBackend]:
     url = getattr(settings, "database_url", "") or os.getenv("DATABASE_URL", "")
     if not url:
@@ -312,3 +368,37 @@ def _count(items: list[dict], key: str) -> dict:
         k = it.get(key, "unknown")
         out[k] = out.get(k, 0) + 1
     return out
+
+
+# ============ 用户（邮箱/密码 或 X / Facebook 第三方登录）============
+_users: dict[str, dict] = {}
+
+
+def create_user(user: dict) -> dict:
+    if _pg is not None:
+        return _pg.create_user(user)
+    with _lock:
+        _users[user["id"]] = user
+        return user
+
+
+def get_user_by_email(email: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.get_user_by_email(email)
+    with _lock:
+        return next((u for u in _users.values() if u["email"] == email), None)
+
+
+def get_user_by_provider(provider: str, provider_id: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.get_user_by_provider(provider, provider_id)
+    with _lock:
+        return next((u for u in _users.values()
+                     if u.get("provider") == provider and u.get("provider_id") == provider_id), None)
+
+
+def get_user_by_id(user_id: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.get_user_by_id(user_id)
+    with _lock:
+        return _users.get(user_id)

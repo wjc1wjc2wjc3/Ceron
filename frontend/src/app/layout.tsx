@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "Ceron 控制台",
-  description: "香港金融业承保与合规自动化前端控制台",
+  title: "Ceron — Underwriting automation for Hong Kong finance",
+  description:
+    "Ceron turns raw submissions into auditable decisions for Hong Kong insurance, trusts and family offices: bilingual extraction, ICRIS / credit bureau enrichment, and SFC / HKMA / MPFA compliance gates.",
 };
 
 export default function RootLayout({

@@ -8,9 +8,13 @@ Go 编排服务（gateway/orchestrator）通过以下 REST 接口调用本服务
   POST /v1/decision  { vertical, extracted, enrichment }
   POST /v1/pipeline  { vertical, text | image_base64 } # 串联 OCR→抽取→富集→决策
 """
-from fastapi import FastAPI
+from typing import Optional
+
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from app import auth
 from app.compliance import check_data_residency
 from app.config import settings
 from app.decision import assess
@@ -160,7 +164,7 @@ def sar_list():
 def sar_status(sar_id: str, body: dict):
     updated = set_status(sar_id, body.get("status", "submitted"))
     if not updated:
-        return {"error": "sar not found"}, 404
+        raise HTTPException(status_code=404, detail="sar not found")
     return {"sar": updated}
 
 
@@ -168,3 +172,104 @@ def sar_status(sar_id: str, body: dict):
 def mi_report():
     """监管 MI 报表：决策统计、告警与 SAR 汇总。"""
     return build_mi_report()
+
+
+# ============ 认证（Auth）：注册 / 登录 / 会话 / X / Facebook 第三方登录 ============
+
+class RegisterReq(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginReq(BaseModel):
+    email: str
+    password: str
+
+
+def _token_from_header(authorization: Optional[str]) -> Optional[str]:
+    """接受 `Bearer <token>` 或裸 token 两种写法。"""
+    if not authorization:
+        return None
+    parts = authorization.split()
+    return parts[-1] if len(parts) in (1, 2) else None
+
+
+@app.get("/v1/auth/providers")
+def auth_providers():
+    """前端据此决定是否显示「使用 X / Facebook 登录」按钮。"""
+    return {"providers": auth.configured_providers()}
+
+
+@app.post("/v1/auth/register")
+def auth_register(req: RegisterReq):
+    try:
+        user = auth.register(req.email, req.password, req.name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return auth.issue(user)
+
+
+@app.post("/v1/auth/login")
+def auth_login(req: LoginReq):
+    user = auth.login(req.email, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    return auth.issue(user)
+
+
+@app.get("/v1/auth/me")
+def auth_me(authorization: Optional[str] = Header(None)):
+    payload = auth.verify_token(_token_from_header(authorization))
+    if not payload:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    user = store.get_user_by_id(payload.get("sub", ""))
+    if not user:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return {"user": auth.public_user(user)}
+
+
+@app.post("/v1/auth/logout")
+def auth_logout():
+    """无状态 JWT：服务端无需处理，客户端丢弃令牌即可。"""
+    return {"ok": True}
+
+
+@app.get("/v1/auth/x/authorize")
+def auth_x_authorize():
+    url = auth.x_authorize()
+    if not url:
+        raise HTTPException(status_code=503, detail="x_not_configured")
+    return {"authorization_url": url}
+
+
+@app.get("/v1/auth/x/callback")
+async def auth_x_callback(request: Request):
+    code = request.query_params.get("code", "")
+    state = request.query_params.get("state", "")
+    target = settings.frontend_url.rstrip("/")
+    try:
+        user = await auth.x_callback(code, state)
+    except Exception as e:
+        return RedirectResponse(f"{target}/login?error={e}")
+    return RedirectResponse(f"{target}/auth/callback?token={auth.create_token(user)}")
+
+
+@app.get("/v1/auth/facebook/authorize")
+def auth_facebook_authorize():
+    url = auth.facebook_authorize()
+    if not url:
+        raise HTTPException(status_code=503, detail="facebook_not_configured")
+    return {"authorization_url": url}
+
+
+@app.get("/v1/auth/facebook/callback")
+async def auth_facebook_callback(request: Request):
+    code = request.query_params.get("code", "")
+    state = request.query_params.get("state", "")
+    target = settings.frontend_url.rstrip("/")
+    try:
+        user = await auth.facebook_callback(code, state)
+    except Exception as e:
+        return RedirectResponse(f"{target}/login?error={e}")
+    return RedirectResponse(f"{target}/auth/callback?token={auth.create_token(user)}")

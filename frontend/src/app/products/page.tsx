@@ -13,7 +13,8 @@ import SummarizeIcon from "@mui/icons-material/Summarize";
 import HubIcon from "@mui/icons-material/Hub";
 import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
 import SyncIcon from "@mui/icons-material/Sync";
-import NavBar from "../../components/NavBar";
+import MarketingNav from "../../components/MarketingNav";
+import SiteFooter from "../../components/SiteFooter";
 import { I18nProvider, useT } from "../i18n";
 
 type Status = "live" | "planned";
@@ -34,17 +35,17 @@ const GROUPS: ProductGroup[] = [
   {
     titleKey: "pgUnderwriting",
     items: [
-      { icon: <DescriptionIcon color="primary" />, key: "pExtract", href: "/", status: "live" },
-      { icon: <FactCheckIcon color="primary" />, key: "pDecision", href: "/", status: "live" },
-      { icon: <ViewKanbanIcon color="primary" />, key: "pKanban", href: "/", status: "live" },
+      { icon: <DescriptionIcon color="primary" />, key: "pExtract", href: "/app", status: "live" },
+      { icon: <FactCheckIcon color="primary" />, key: "pDecision", href: "/app", status: "live" },
+      { icon: <ViewKanbanIcon color="primary" />, key: "pKanban", href: "/app", status: "live" },
     ],
   },
   {
     titleKey: "pgCompliance",
     items: [
-      { icon: <NotificationsActiveIcon color="primary" />, key: "pMonitor", href: "/compliance", status: "live" },
-      { icon: <GavelIcon color="primary" />, key: "pSar", href: "/compliance", status: "live" },
-      { icon: <SummarizeIcon color="primary" />, key: "pMi", href: "/compliance", status: "live" },
+      { icon: <NotificationsActiveIcon color="primary" />, key: "pMonitor", href: "/app/compliance", status: "live" },
+      { icon: <GavelIcon color="primary" />, key: "pSar", href: "/app/compliance", status: "live" },
+      { icon: <SummarizeIcon color="primary" />, key: "pMi", href: "/app/compliance", status: "live" },
     ],
   },
   {
@@ -238,8 +239,9 @@ function Products() {
 export default function ProductsPage() {
   return (
     <I18nProvider>
-      <NavBar />
+      <MarketingNav />
       <Products />
+      <SiteFooter />
     </I18nProvider>
   );
 }
