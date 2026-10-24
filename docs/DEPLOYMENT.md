@@ -26,11 +26,13 @@
 | 文件 | 作用 |
 |---|---|
 | `backend/python-svc/.env.example` | LLM/OCR/富集/数据驻留/脱敏开关。复制为 `.env` 后修改 |
-| `backend/go-svc/.env.example` | `PYTHON_SVC_URL`、`GO_SVC_PORT`、`WORKERS`、`CRM_WEBHOOK_URL` |
-| `docker-compose.yml` | 三服务本地编排（读取各服务环境变量） |
+| `backend/go-svc/.env.example` | `PYTHON_SVC_URL`、`GO_SVC_PORT`、`WORKERS`、`CRM_WEBHOOK_URL`、`DATABASE_URL`、`NATS_URL` |
+| `docker-compose.yml` | 五服务编排：frontend + go-svc + python-svc + postgres + nats |
 | `deploy/k8s/01-configmap.yaml` / `02-secret.yaml` | K8s 非密/敏感配置（含 `LLM_API_KEY` 等） |
 
 > Go 服务不自动加载 `.env`，裸机请用 systemd `EnvironmentFile` 或 NSSM `AppEnvironment` 注入；容器内/K8s 通过环境变量或 ConfigMap/Secret 注入。
+
+> **持久化构建标签**：Postgres 与 NATS 支持通过 Go build tag 启用（不引入外部依赖也可编译运行）。启用：`go build -tags postgres,nats ./cmd/server`；Docker / Compose 已默认带该标签构建。未启用时 `DATABASE_URL` 留空走内存存储、`NATS_URL` 留空走进程内 worker 池（功能等价，但重启丢作业、不支持多实例水平扩展）。
 
 镜像约定（K8s / 私有仓库用）：`ceron/python-svc:latest`、`ceron/go-svc:latest`、`ceron/frontend:latest`。
 
@@ -61,6 +63,21 @@ docker run -d --name go-svc -p 8080:8080 \
 # frontend
 docker run -d --name frontend -p 3000:3000 \
   -e API_BASE=http://<go-host>:8080 ceron/frontend:latest
+```
+
+### 3.4 持久化（Postgres + NATS）
+`docker-compose.yml` 已内置 `postgres`（5432）与 `nats`（-js 启用 JetStream，4222/8222），并在 `go-svc` 注入：
+- `DATABASE_URL=postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable` → 作业落库，重启不丢、看板可查历史。
+- `NATS_URL=nats://nats:4222` → 异步作业经 JetStream，支持多 go-svc 实例水平扩展。
+
+单容器手动运行如需持久化，构建时带标签并传入同上环境变量即可：
+```bash
+docker build -t ceron/go-svc:latest -f backend/go-svc/Dockerfile backend/go-svc
+docker run -d --name go-svc -p 8080:8080 --link postgres --link nats \
+  -e PYTHON_SVC_URL=http://<python-host>:8000 \
+  -e DATABASE_URL=postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable \
+  -e NATS_URL=nats://nats:4222 \
+  ceron/go-svc:latest
 ```
 
 ### 3.3 构建并推送到镜像仓库（供 K8s / 远程主机）
@@ -231,6 +248,39 @@ kubectl -n ceron rollout status deploy/go-svc
 kubectl -n ceron rollout undo deploy/go-svc         # 回滚到上一版本
 ```
 
+### 6.6 持久化（Postgres + NATS）
+生产建议将 Postgres / NATS 作为托管服务或独立 StatefulSet 提供，再注入 `DATABASE_URL` 与 `NATS_URL`：
+```bash
+# 方式 A：使用集群内自建（示例为 Service 名）
+kubectl -n ceron apply -f - <<'YAML'
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres, namespace: ceron }
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER, value: ceron }
+            - { name: POSTGRES_PASSWORD, value: ceron }
+            - { name: POSTGRES_DB, value: ceron }
+          ports: [{ containerPort: 5432 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: ceron }
+spec: { selector: { app: postgres }, ports: [{ port: 5432, targetPort: 5432 }] }
+YAML
+# NATS 同理（镜像 nats:2.10，command ["-js"]，Service 名 nats:4222）
+```
+然后更新 `deploy/k8s/01-configmap.yaml` 使 `DATABASE_URL=postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable`、`NATS_URL=nats://nats:4222`，重新 `kubectl apply -k deploy/k8s`。注意：go-svc 镜像须以 `-tags postgres,nats` 构建（Compose/CI 默认已带）。
+
 ---
 
 ## 7. 部署验证清单（通用）
@@ -254,3 +304,6 @@ kubectl -n ceron rollout undo deploy/go-svc         # 回滚到上一版本
 | K8s Pod 一直 CrashLoopBackOff | 看 `kubectl -n ceron logs <pod>`；多为镜像拉取失败（需设 imagePullSecrets）或 `/health` 探针端口错 |
 | Nginx 502 | upstream 地址不可达；确认 python-svc/go-svc 已起且防火墙放行对应端口 |
 | Ingress 无外部 IP | ingress-nginx 控制器未装或 `ingressClassName: nginx` 不匹配 |
+| go-svc 启动报 `postgres support not compiled in` | 设置了 `DATABASE_URL` 但未用 `-tags postgres` 构建；Docker/Compose 已带标签，裸机需 `go build -tags postgres,nats ./cmd/server` |
+| 作业重启后仍丢失 | 未配置 `DATABASE_URL`（走内存存储）；配置 Postgres 后作业持久化 |
+| NATS 连接失败 | `NATS_URL` 指向的 nats 未启用 JetStream；确保以 `-js` 启动，或 `nats` 服务未就绪（compose 已加 healthcheck） |

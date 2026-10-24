@@ -1,4 +1,32 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ceron
+      POSTGRES_PASSWORD: ceron
+      POSTGRES_DB: ceron
+    ports:
+      - "5432:5432"
+    volumes:
+      - ceron_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ceron"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2.10
+    command: ["-js"]   # 启用 JetStream
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   python-svc:
     build:
       context: ./backend/python-svc
@@ -8,6 +36,8 @@ services:
       - DATA_REGION=hk
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
 
   go-svc:
     build:
@@ -16,10 +46,18 @@ services:
     environment:
       - PYTHON_SVC_URL=http://python-svc:8000
       - GO_SVC_PORT=8080
+      - WORKERS=4
+      - DATABASE_URL=postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable
+      - NATS_URL=nats://nats:4222
     ports:
       - "8080:8080"
     depends_on:
-      - python-svc
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      python-svc:
+        condition: service_started
 
   frontend:
     build:
@@ -31,3 +69,6 @@ services:
       - "3000:3000"
     depends_on:
       - go-svc
+
+volumes:
+  ceron_pg:

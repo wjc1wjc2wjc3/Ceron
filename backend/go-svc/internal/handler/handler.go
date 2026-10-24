@@ -34,6 +34,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/intake/async", s.IntakeAsync)
 	mux.HandleFunc("/v1/ingest/whatsapp", s.IngestWhatsApp)
 	mux.HandleFunc("/v1/ingest/wecom", s.IngestWeCom)
+	mux.HandleFunc("/v1/jobs", s.ListJobs)
 	mux.HandleFunc("/v1/jobs/", s.GetJob)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "gateway"})
@@ -95,6 +96,20 @@ func (s *Server) IngestWeCom(w http.ResponseWriter, r *http.Request) {
 	}
 	job := s.O.Submit(newJobID(), msg.Vertical, msg.Text)
 	writeJSON(w, http.StatusAccepted, job)
+}
+
+// ListJobs 列出作业（看板数据源，支持持久化存储分页/恢复）。
+func (s *Server) ListJobs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobs, err := s.O.List()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"jobs": jobs, "count": len(jobs)})
 }
 
 // GetJob 查询作业结果：/v1/jobs/{id}。

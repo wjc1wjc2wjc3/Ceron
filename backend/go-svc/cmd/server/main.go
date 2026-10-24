@@ -1,5 +1,7 @@
 // Ceron Go 网关/编排服务：高并发收件与流水线编排，调用 Python 智能服务层。
 // 支持同步/异步作业、WhatsApp/企業微信 webhook 收件、CRM webhook 同步。
+// 作业持久化：DATABASE_URL 设置时走 Postgres，否则内存；异步队列：NATS_URL 设置时走
+// NATS JetStream，否则进程内 worker 池。
 package main
 
 import (
@@ -13,6 +15,7 @@ import (
 	"ceron-go/internal/handler"
 	"ceron-go/internal/orchestrator"
 	"ceron-go/internal/queue"
+	"ceron-go/internal/store"
 )
 
 func env(key, fallback string) string {
@@ -36,13 +39,37 @@ func main() {
 	port := env("GO_SVC_PORT", "8080")
 	workers := envInt("WORKERS", 4)
 	crmURL := os.Getenv("CRM_WEBHOOK_URL")
+	dbURL := os.Getenv("DATABASE_URL")
+	natsURL := os.Getenv("NATS_URL")
 
 	py := client.New(pyURL)
-	pool := queue.NewPool(workers, 256)
 	crm := connectors.New(crmURL)
 
-	orc := orchestrator.New(py)
-	orc.Pool = pool
+	// —— 作业持久化层 ——
+	st, err := store.Open(dbURL)
+	if err != nil {
+		log.Fatalf("store init failed: %v", err)
+	}
+	if st.Kind() == "postgres" {
+		log.Printf("job store: postgres")
+	} else {
+		log.Printf("job store: memory (set DATABASE_URL to enable postgres)")
+	}
+
+	orc := orchestrator.New(py, st)
+
+	// —— 异步队列层 ——
+	q, err := queue.NewQueue(natsURL, workers, orc.Process)
+	if err != nil {
+		log.Fatalf("queue init failed: %v", err)
+	}
+	if natsURL != "" {
+		log.Printf("queue: nats jetstream (%s)", natsURL)
+	} else {
+		log.Printf("queue: in-memory pool (workers=%d, set NATS_URL to enable jetstream)", workers)
+	}
+	orc.Queue = q
+
 	orc.OnComplete = func(j *orchestrator.Job) {
 		if err := crm.Sync(j); err != nil {
 			log.Printf("crm sync failed for job %s: %v", j.ID, err)
@@ -50,12 +77,10 @@ func main() {
 	}
 
 	srv := handler.New(orc)
-
 	mux := http.NewServeMux()
 	srv.Register(mux)
 
-	log.Printf("Ceron gateway listening on :%s, python svc=%s, workers=%d, crm=%s",
-		port, pyURL, workers, crmURL)
+	log.Printf("Ceron gateway listening on :%s, python svc=%s", port, pyURL)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

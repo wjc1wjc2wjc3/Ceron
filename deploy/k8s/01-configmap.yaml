@@ -13,5 +13,8 @@ data:
   PYTHON_SVC_URL: "http://python-svc:8000"
   GO_SVC_PORT: "8080"
   WORKERS: "4"
+  # 持久化（需先部署 postgres / nats，并以 -tags postgres,nats 构建 go-svc 镜像）
+  DATABASE_URL: "postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable"
+  NATS_URL: "nats://nats:4222"
   # frontend
   API_BASE: "http://go-svc:8080"

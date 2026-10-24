@@ -16,6 +16,8 @@ frontend :3000  ──/api 反代──▶  go-svc :8080  ──REST──▶  p
 | go-svc | 8080 | `GET /health` |
 | frontend | 3000 | HTTP 200 |
 
+**持久化**：go-svc 作业默认存于进程内存（重启即丢）。配置 `DATABASE_URL`（Postgres，需 `-tags postgres` 构建）后落库，重启不丢、可审计、前端看板可分页查询历史；配置 `NATS_URL`（JetStream，需 `-tags nats` 构建）后异步队列 durable，支持多 go-svc 实例水平扩展。两者均未配置时退化为内存存储 + 进程内 worker 池（功能等价，但无持久化/水平扩展）。
+
 ## 2. 日常运维
 
 - **启动/停止**：
@@ -88,6 +90,7 @@ kubectl -n ceron rollout undo deploy/<svc>
 | 新增服务/端口 | `docs/DEPLOYMENT.md`、本手册 §1、`docker-compose.yml` |
 | 新增模块/能力 | 根 `README.md` 架构与能力清单 |
 | 部署方式变化（Docker/Nginx/K8s） | `docs/DEPLOYMENT.md`、对应 `deploy/` 产物（nginx/k8s）、本手册 §2/§4 |
+| 持久化/异步队列变化（Postgres/NATS、build tags） | `docs/DEPLOYMENT.md` §2/§3.4/§6.6、本手册 §1、`go-svc/.env.example`、`go-svc/Dockerfile`（构建标签） |
 | 验证状态变化 | 根 `README.md`「已验证」章节（测试数、构建结果） |
 
 提交前检查项：代码改了，上表对应文档与 `deploy/` 部署产物是否也改了？

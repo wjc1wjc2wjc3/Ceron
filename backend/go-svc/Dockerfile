@@ -3,6 +3,7 @@ WORKDIR /src
 COPY go.mod ./
 RUN go mod download
 COPY . .
-RUN go build -o /out/server ./cmd/server
+# 启用 postgres + nats 持久化能力（需联网拉取 lib/pq / nats.go）
+RUN go build -tags postgres,nats -o /out/server ./cmd/server
 EXPOSE 8080
 CMD ["/out/server"]
