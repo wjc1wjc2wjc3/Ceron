@@ -79,6 +79,10 @@ const sampleFor = (loc: string, vertical: string): string => {
   return byLoc[vertical] ?? byLoc.insurance_hk;
 };
 
+// 判断当前文本是否仍是某个内置示例（是则可随语言/业务线自动切换，否则不打扰用户输入）。
+const isSampleText = (s: string): boolean =>
+  Object.values(SAMPLES).some((byLoc) => Object.values(byLoc).includes(s));
+
 const ACTION_COLOR: Record<DecisionAction, "success" | "warning" | "error"> = {
   approve: "success",
   manual_review: "warning",
@@ -116,6 +120,12 @@ function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+
+  // 切换语言 / 业务线时，若文本框仍是内置示例，则自动换成对应语言、对应业务线的示例。
+  useEffect(() => {
+    setText((cur) => (isSampleText(cur) ? sampleFor(locale, vertical) : cur));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, vertical]);
   const [reviewer, setReviewer] = useState("");
   const timers = useRef<Record<string, any>>({});
 
