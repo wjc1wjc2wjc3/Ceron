@@ -2,6 +2,10 @@
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
+load_dotenv()  # 自动加载同目录 .env（密钥不进命令行、不入版本库）
+
 
 @dataclass
 class Settings:

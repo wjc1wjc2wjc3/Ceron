@@ -103,11 +103,11 @@ cd backend/python-svc && py poc/bilingual_poc.py
 - `pytest`（backend/python-svc）：**9/9 通过**（脱敏、繁中/英正则、OCR mock、富集 Provider、family_office 流水线）。
 - 双语 PoC：繁中保险 / 英文保险 / 家族办公室三组样本 **21/21 字段命中（100%）**（mock 正则基线）。
 - `go build ./...` 与 `go vet ./...` 全部通过（含 queue/ingest/connectors 新包）。
-- 前端为最小脚手架（健康检查 + 文档提交表单），待接入真实业务页面。
+- 前端：Next.js 控制台已落地（文档提交、抽取/富集/决策结果展示、作业审批看板），`npm install` + `npm run build` 通过。
 
 ## 下一步建议
-1. 用真实密钥跑双语 PoC，评估国产/国际模型准确率差异；
+1. 用真实密钥跑双语 PoC，评估国产/国际模型准确率差异（`LLM_API_KEY` 配好后 `py poc/bilingual_poc.py`）；
 2. ICRIS / 制裁名单真实凭证接入与联调；
 3. Azure OCR 用真实月结单/保单扫描件调优；
 4. WhatsApp Cloud API / 企業微信回调真实报文适配（现 ingest 为简化载荷）；
-5. 作业表持久化（Postgres）+ NATS/Kafka 替换内存队列；前端业务页面（结果展示、审批看板）。
+5. 作业表持久化（Postgres）+ NATS/Kafka 替换内存队列。
