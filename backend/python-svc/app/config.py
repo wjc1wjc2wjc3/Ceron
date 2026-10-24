@@ -43,6 +43,10 @@ class Settings:
     hmt_api_key: str = os.getenv("HMT_API_KEY", "")
     crs_api_url: str = os.getenv("CRS_API_URL", "")
     crs_api_key: str = os.getenv("CRS_API_KEY", "")
+    # ===== 优先级 3：持续监控（Ongoing Monitoring）=====
+    # 是否启用后台周期性重查调度（默认关闭；生产建议开启以符合持续尽职要求）
+    monitoring_enabled: bool = str(os.getenv("MONITORING_ENABLED", "false")).lower() == "true"
+    monitoring_interval: int = int(os.getenv("MONITORING_INTERVAL_SECONDS", "300"))
 
 
 settings = Settings()

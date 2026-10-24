@@ -12,11 +12,16 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app.compliance import check_data_residency
+from app.config import settings
 from app.decision import assess
 from app.enrichment import enrich
 from app.extraction import extract_document
+from app.mi import build_mi_report
+from app.monitoring import run_scan, start_scheduler
 from app.ocr import get_ocr_provider
+from app.sar import create_sar, list_sars, set_status
 from app.schemas import Vertical
+from app import store
 
 app = FastAPI(title="Ceron Intelligence Service", version="0.3.0",
               description="香港金融业承保与合规自动化的 Python 大模型智能服务层")
@@ -48,6 +53,19 @@ class PipelineReq(BaseModel):
     text: str = ""
     image_base64: str = ""
     locale: str = "zh-HK"
+
+
+class SarReq(BaseModel):
+    name: str
+    vertical: str = ""
+    reason: str = ""
+    decision_summary: dict = {}
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    if settings.monitoring_enabled:
+        start_scheduler(settings.monitoring_interval)
 
 
 @app.get("/health")
@@ -92,6 +110,16 @@ async def pipeline_endpoint(req: PipelineReq):
     res = await extract_document(text, req.vertical)
     enrichment = enrich(req.vertical.value, res["extracted"], req.locale)
     decision = assess(req.vertical, res["extracted"], enrichment, req.locale)
+    # 优先级 3：记录决策历史（供 MI）并登记实体（供持续监控）
+    name = (
+        res["extracted"].get("客户姓名或实体名称")
+        or res["extracted"].get("投保人")
+        or res["extracted"].get("申请人")
+        or res["extracted"].get("成员姓名或实体名称")
+        or res["extracted"].get("基金名称或实体名称")
+        or res["extracted"].get("受保人")
+    )
+    store.record_run(req.vertical.value, decision["action"], decision["risk_score"], name)
     return {
         "vertical": res["vertical"],
         "ocr_used": ocr_used,
@@ -100,3 +128,43 @@ async def pipeline_endpoint(req: PipelineReq):
         "enrichment": enrichment,
         "decision": decision,
     }
+
+
+# ============ 优先级 3：持续监控 / SAR 申报 / 监管 MI ============
+
+@app.post("/v1/monitoring/scan")
+def monitoring_scan():
+    """触发对已登记实体的 sanctions/OFAC/HMT 重查，返回命中实体名。"""
+    hits = run_scan()
+    return {"scanned": len(store.list_entities()), "hits": hits}
+
+
+@app.get("/v1/monitoring/alerts")
+def monitoring_alerts():
+    return {"alerts": store.list_alerts()}
+
+
+@app.post("/v1/sar")
+def sar_create(req: SarReq):
+    """创建一份 SAR 草稿（高风险决策应触发 SAR 申报评估）。"""
+    sar = create_sar(req.name, req.vertical, req.reason, req.decision_summary)
+    return {"sar": sar}
+
+
+@app.get("/v1/sar")
+def sar_list():
+    return {"sars": list_sars()}
+
+
+@app.post("/v1/sar/{sar_id}/status")
+def sar_status(sar_id: str, body: dict):
+    updated = set_status(sar_id, body.get("status", "submitted"))
+    if not updated:
+        return {"error": "sar not found"}, 404
+    return {"sar": updated}
+
+
+@app.get("/v1/mi")
+def mi_report():
+    """监管 MI 报表：决策统计、告警与 SAR 汇总。"""
+    return build_mi_report()
