@@ -137,4 +137,33 @@ def get_enrich_provider() -> EnrichProvider:
 
 
 def enrich(vertical: str, extracted: dict) -> dict:
-    return get_enrich_provider().enrich(vertical, extracted)
+    """运行全部已配置的富集 Provider（ICRIS / 制裁名单），与 mock 基线合并。
+
+    当 .env 配置了 ICRIS_API_URL / SANCTIONS_API_URL 时，对应 Provider 会被实际调用；
+    任一外部源调用失败均自动降级并打「需人工複核」标记，流水线不中断。
+    两者均未配置时退化为 mock 基线（离线可跑）。
+    """
+    result = _base_result(extracted)
+    providers: list = []
+    if settings.icris_api_url:
+        providers.append(IcrisProvider(settings.icris_api_url, settings.icris_api_key))
+    if settings.sanctions_api_url:
+        providers.append(SanctionsProvider(settings.sanctions_api_url, settings.sanctions_api_key))
+    if not providers:
+        return result
+
+    result["provider"] = "+".join(p.name for p in providers)
+    for p in providers:
+        r = p.enrich(vertical, extracted)
+        result["icris_verified"] = result["icris_verified"] or r.get("icris_verified", False)
+        result["sanctions_hit"] = result["sanctions_hit"] or r.get("sanctions_hit", False)
+        for f in r.get("flags", []):
+            if f not in result["flags"]:
+                result["flags"].append(f)
+        if r.get("icris_company_status"):
+            result["icris_company_status"] = r["icris_company_status"]
+        if r.get("sanctions_lists"):
+            result["sanctions_lists"] = r["sanctions_lists"]
+        if r.get("risk_from_enrich") == "high":
+            result["risk_from_enrich"] = "high"
+    return result

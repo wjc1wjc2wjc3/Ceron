@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -98,18 +99,32 @@ func (s *Server) IngestWeCom(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, job)
 }
 
-// ListJobs 列出作业（看板数据源，支持持久化存储分页/恢复）。
+// ListJobs 列出作业（看板数据源），支持 ?status=&limit=&offset= 过滤分页。
 func (s *Server) ListJobs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	jobs, err := s.O.List()
+	status := r.URL.Query().Get("status")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	jobs, total, err := s.O.List(status, limit, offset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"jobs": jobs, "count": len(jobs)})
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"jobs":   jobs,
+		"count":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 // GetJob 查询作业结果：/v1/jobs/{id}；PATCH /v1/jobs/{id}/review 记录人工审批。
@@ -138,18 +153,19 @@ func (s *Server) GetJob(w http.ResponseWriter, r *http.Request) {
 }
 
 type reviewRequest struct {
-	Status string `json:"status"` // approved | rejected
-	Note   string `json:"note"`
+	Status   string `json:"status"` // approved | rejected
+	Note     string `json:"note"`
+	Reviewer string `json:"reviewer"` // 审批人（可空，默认 manual）
 }
 
-// ReviewJob 记录人工审批结论并持久化。
+// ReviewJob 记录人工审批结论并持久化（含审计字段）。
 func (s *Server) ReviewJob(w http.ResponseWriter, r *http.Request, id string) {
 	var req reviewRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	job, err := s.O.SetReview(id, req.Status, req.Note)
+	job, err := s.O.SetReview(id, req.Status, req.Note, req.Reviewer)
 	if err != nil {
 		code := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {

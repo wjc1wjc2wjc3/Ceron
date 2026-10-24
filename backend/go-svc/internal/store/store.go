@@ -4,6 +4,7 @@ package store
 
 import (
 	"errors"
+	"sort"
 	"sync"
 
 	"ceron-go/internal/orchestrator"
@@ -45,13 +46,45 @@ func (s *MemoryStore) Get(id string) (*orchestrator.Job, error) {
 	return j, nil
 }
 
-// List 返回全部作业（实现从简，生产可加分页/过滤）。
-func (s *MemoryStore) List() ([]*orchestrator.Job, error) {
+// List 按状态过滤 + 分页返回作业（按创建时间倒序）；limit<=0 或 >200 取 50，offset<0 取 0。
+func (s *MemoryStore) List(status string, limit, offset int) ([]*orchestrator.Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([]*orchestrator.Job, 0, len(s.jobs))
+	all := make([]*orchestrator.Job, 0, len(s.jobs))
 	for _, j := range s.jobs {
-		out = append(out, j)
+		if status == "" || j.Status == status {
+			all = append(all, j)
+		}
 	}
-	return out, nil
+	sort.SliceStable(all, func(i, k int) bool { return all[i].CreatedAt.After(all[k].CreatedAt) })
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset > len(all) {
+		return []*orchestrator.Job{}, nil
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end], nil
+}
+
+// Count 返回符合过滤条件的作业总数。
+func (s *MemoryStore) Count(status string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if status == "" {
+		return len(s.jobs), nil
+	}
+	c := 0
+	for _, j := range s.jobs {
+		if j.Status == status {
+			c++
+		}
+	}
+	return c, nil
 }

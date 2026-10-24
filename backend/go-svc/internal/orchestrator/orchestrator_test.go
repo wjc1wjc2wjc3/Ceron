@@ -27,14 +27,42 @@ func TestRunPersistsAndLists(t *testing.T) {
 		t.Fatalf("result missing: %v", job.Result)
 	}
 
-	jobs, err := orc.List()
-	if err != nil || len(jobs) != 1 {
-		t.Fatalf("list=%v err=%v", jobs, err)
+	jobs, total, err := orc.List("", 50, 0)
+	if err != nil || len(jobs) != 1 || total != 1 {
+		t.Fatalf("list=%v total=%d err=%v", jobs, total, err)
 	}
 
 	got, err := orc.Get("j1")
 	if err != nil || got.Status != "completed" {
 		t.Fatalf("get=%v err=%v", got, err)
+	}
+}
+
+func TestSetReviewAudit(t *testing.T) {
+	st := store.NewMemory()
+	orc := orchestrator.New(nil, st)
+	orc.PipelineFn = func(vertical, text string) (map[string]interface{}, error) {
+		return map[string]interface{}{"ok": true}, nil
+	}
+	if _, err := orc.Run("r1", "insurance_hk", "text"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := orc.SetReview("r1", "approved", "looks good", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ReviewStatus != "approved" || got.ReviewedBy != "alice" {
+		t.Fatalf("review not recorded: %+v", got)
+	}
+	if got.ReviewedAt.IsZero() {
+		t.Fatal("ReviewedAt should be set")
+	}
+	stored, err := st.Get("r1")
+	if err != nil || stored.ReviewedBy != "alice" {
+		t.Fatalf("review not persisted: %+v err=%v", stored, err)
+	}
+	if _, err := orc.SetReview("r1", "maybe", "", ""); err == nil {
+		t.Fatal("expected error for invalid status")
 	}
 }
 

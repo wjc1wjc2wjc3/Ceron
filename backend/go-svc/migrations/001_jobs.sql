@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   error         TEXT,
   review_status TEXT NOT NULL DEFAULT '',
   review_note   TEXT,
+  reviewed_by   TEXT NOT NULL DEFAULT '',
+  reviewed_at   TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

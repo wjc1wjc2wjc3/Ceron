@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	"ceron-go/internal/orchestrator"
 	_ "github.com/lib/pq"
@@ -26,6 +27,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   error         TEXT,
   review_status TEXT NOT NULL DEFAULT '',
   review_note   TEXT,
+  reviewed_by   TEXT NOT NULL DEFAULT '',
+  reviewed_at   TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );`
 
@@ -51,16 +54,18 @@ func (s *PGStore) Kind() string { return "postgres" }
 func (s *PGStore) Upsert(j *orchestrator.Job) error {
 	raw, _ := json.Marshal(j.Result)
 	_, err := s.db.Exec(`
-		INSERT INTO jobs (id, vertical, status, result, error, review_status, review_note, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO jobs (id, vertical, status, result, error, review_status, review_note, reviewed_by, reviewed_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO UPDATE SET
 			vertical      = EXCLUDED.vertical,
 			status        = EXCLUDED.status,
 			result        = EXCLUDED.result,
 			error         = EXCLUDED.error,
 			review_status = EXCLUDED.review_status,
-			review_note   = EXCLUDED.review_note`,
-		j.ID, j.Vertical, j.Status, raw, j.Error, j.ReviewStatus, j.ReviewNote, j.CreatedAt)
+			review_note   = EXCLUDED.review_note,
+			reviewed_by   = EXCLUDED.reviewed_by,
+			reviewed_at   = EXCLUDED.reviewed_at`,
+		j.ID, j.Vertical, j.Status, raw, j.Error, j.ReviewStatus, j.ReviewNote, j.ReviewedBy, j.ReviewedAt, j.CreatedAt)
 	return err
 }
 
@@ -69,8 +74,8 @@ func (s *PGStore) Get(id string) (*orchestrator.Job, error) {
 	j := &orchestrator.Job{}
 	var raw []byte
 	err := s.db.QueryRow(
-		`SELECT id, vertical, status, result, error, review_status, review_note, created_at FROM jobs WHERE id = $1`, id).
-		Scan(&j.ID, &j.Vertical, &j.Status, &raw, &j.Error, &j.ReviewStatus, &j.ReviewNote, &j.CreatedAt)
+		`SELECT id, vertical, status, result, error, review_status, review_note, reviewed_by, reviewed_at, created_at FROM jobs WHERE id = $1`, id).
+		Scan(&j.ID, &j.Vertical, &j.Status, &raw, &j.Error, &j.ReviewStatus, &j.ReviewNote, &j.ReviewedBy, &j.ReviewedAt, &j.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -83,10 +88,22 @@ func (s *PGStore) Get(id string) (*orchestrator.Job, error) {
 	return j, nil
 }
 
-// List 返回最近 200 条作业（按创建时间倒序）。
-func (s *PGStore) List() ([]*orchestrator.Job, error) {
-	rows, err := s.db.Query(
-		`SELECT id, vertical, status, result, error, review_status, review_note, created_at FROM jobs ORDER BY created_at DESC LIMIT 200`)
+// List 按状态过滤 + 分页返回作业（按创建时间倒序）。
+func (s *PGStore) List(status string, limit, offset int) ([]*orchestrator.Job, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	query := `SELECT id, vertical, status, result, error, review_status, review_note, reviewed_by, reviewed_at, created_at FROM jobs`
+	args := []interface{}{}
+	if status != "" {
+		query += ` WHERE status = $1`
+		args = append(args, status)
+	}
+	query += ` ORDER BY created_at DESC LIMIT ` + strconv.Itoa(limit) + ` OFFSET ` + strconv.Itoa(offset)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +112,7 @@ func (s *PGStore) List() ([]*orchestrator.Job, error) {
 	for rows.Next() {
 		j := &orchestrator.Job{}
 		var raw []byte
-		if err := rows.Scan(&j.ID, &j.Vertical, &j.Status, &raw, &j.Error, &j.ReviewStatus, &j.ReviewNote, &j.CreatedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.Vertical, &j.Status, &raw, &j.Error, &j.ReviewStatus, &j.ReviewNote, &j.ReviewedBy, &j.ReviewedAt, &j.CreatedAt); err != nil {
 			return nil, err
 		}
 		if len(raw) > 0 {
@@ -104,4 +121,16 @@ func (s *PGStore) List() ([]*orchestrator.Job, error) {
 		out = append(out, j)
 	}
 	return out, rows.Err()
+}
+
+// Count 返回符合过滤条件的作业总数。
+func (s *PGStore) Count(status string) (int, error) {
+	if status == "" {
+		var n int
+		err := s.db.QueryRow(`SELECT count(*) FROM jobs`).Scan(&n)
+		return n, err
+	}
+	var n int
+	err := s.db.QueryRow(`SELECT count(*) FROM jobs WHERE status = $1`, status).Scan(&n)
+	return n, err
 }

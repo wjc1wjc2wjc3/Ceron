@@ -5,6 +5,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ type Job struct {
 	Error        string                 `json:"error,omitempty"`
 	ReviewStatus string                 `json:"review_status,omitempty"` // "" | approved | rejected
 	ReviewNote   string                 `json:"review_note,omitempty"`
+	ReviewedBy   string                 `json:"reviewed_by,omitempty"` // 审批人（默认 manual）
+	ReviewedAt   time.Time              `json:"reviewed_at,omitempty"`
 	CreatedAt    time.Time              `json:"created_at"`
 }
 
@@ -28,7 +31,8 @@ type Job struct {
 type JobStore interface {
 	Upsert(*Job) error
 	Get(id string) (*Job, error)
-	List() ([]*Job, error)
+	List(status string, limit, offset int) ([]*Job, error)
+	Count(status string) (int, error)
 	Kind() string // "memory" | "postgres"
 }
 
@@ -137,23 +141,47 @@ func (o *Orchestrator) Get(id string) (*Job, error) {
 	return job, nil
 }
 
-// List 返回作业列表（优先持久化存储，支持重启后恢复）。
-func (o *Orchestrator) List() ([]*Job, error) {
+// List 返回作业列表（按状态过滤 + 分页；优先持久化存储，支持重启后恢复），并返回符合条件的总数。
+func (o *Orchestrator) List(status string, limit, offset int) ([]*Job, int, error) {
 	if o.Store != nil {
-		return o.Store.List()
+		jobs, err := o.Store.List(status, limit, offset)
+		if err != nil {
+			return nil, 0, err
+		}
+		total, err := o.Store.Count(status)
+		if err != nil {
+			return nil, 0, err
+		}
+		return jobs, total, nil
 	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	out := make([]*Job, 0, len(o.jobs))
+	all := make([]*Job, 0, len(o.jobs))
 	for _, j := range o.jobs {
-		out = append(out, j)
+		if status == "" || j.Status == status {
+			all = append(all, j)
+		}
 	}
-	return out, nil
+	sort.SliceStable(all, func(i, k int) bool { return all[i].CreatedAt.After(all[k].CreatedAt) })
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset > len(all) {
+		return []*Job{}, 0, nil
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end], len(all), nil
 }
 
-// SetReview 记录人工审批结论（approved/rejected），持久化并返回更新后的作业。
-// 支持作业不在内存缓存时回源持久化存储。
-func (o *Orchestrator) SetReview(id, status, note string) (*Job, error) {
+// SetReview 记录人工审批结论（approved/rejected）与审计信息，持久化并返回更新后的作业。
+// 支持作业不在内存缓存时回源持久化存储。reviewer 为空时记为 "manual"。
+func (o *Orchestrator) SetReview(id, status, note, reviewer string) (*Job, error) {
 	if status != "approved" && status != "rejected" {
 		return nil, fmt.Errorf("invalid review status: %s", status)
 	}
@@ -171,8 +199,13 @@ func (o *Orchestrator) SetReview(id, status, note string) (*Job, error) {
 	if job == nil {
 		return nil, fmt.Errorf("job %s not found", id)
 	}
+	if reviewer == "" {
+		reviewer = "manual"
+	}
 	job.ReviewStatus = status
 	job.ReviewNote = note
+	job.ReviewedBy = reviewer
+	job.ReviewedAt = time.Now().UTC()
 	o.persist(job)
 	return job, nil
 }

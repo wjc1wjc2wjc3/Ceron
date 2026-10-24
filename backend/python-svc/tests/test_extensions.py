@@ -3,6 +3,7 @@ import asyncio
 import base64
 import os
 import sys
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,6 +13,7 @@ from app.regex_extract import rule_extract  # noqa: E402
 from app.schemas import Vertical  # noqa: E402
 from app.extraction import extract_document  # noqa: E402
 from app.decision import assess  # noqa: E402
+from app.config import settings  # noqa: E402
 
 
 def test_ocr_mock_returns_text():
@@ -62,3 +64,46 @@ def test_family_office_pipeline():
     res, enrichment, decision = asyncio.run(run())
     assert res["extracted"].get("资产规模港币万") == 50000.0
     assert decision["action"] in ("approve", "manual_review", "reject")
+
+
+def test_enrich_runs_icris_when_configured(monkeypatch):
+    monkeypatch.setattr(settings, "icris_api_url", "http://fake-icris")
+    monkeypatch.setattr(settings, "icris_api_key", "k")
+    monkeypatch.setattr(settings, "sanctions_api_url", "")
+    with patch("httpx.post") as m:
+        m.return_value = Mock(status_code=200, json=lambda: {"verified": True, "company_status": "Active"})
+        result = enrich("insurance_hk", {"投保人": "X有限公司", "保单号": "HK1"})
+        assert result["provider"] == "icris"
+        assert result["icris_verified"] is True
+        assert result["icris_company_status"] == "Active"
+        m.assert_called_once()
+        _, kwargs = m.call_args
+        assert kwargs["json"]["company_name"] == "X有限公司"
+        assert kwargs["headers"]["Authorization"] == "Bearer k"
+
+
+def test_enrich_icris_degrades_on_error(monkeypatch):
+    monkeypatch.setattr(settings, "icris_api_url", "http://fake-icris")
+    monkeypatch.setattr(settings, "icris_api_key", "")
+    monkeypatch.setattr(settings, "sanctions_api_url", "")
+    with patch("httpx.post", side_effect=Exception("boom")):
+        result = enrich("insurance_hk", {"投保人": "X有限公司"})
+        assert result["provider"] == "icris"
+        assert any("人工複核" in f for f in result["flags"])
+        assert result["risk_from_enrich"] == "high"
+
+
+def test_enrich_runs_both_providers(monkeypatch):
+    monkeypatch.setattr(settings, "icris_api_url", "http://fake-icris")
+    monkeypatch.setattr(settings, "sanctions_api_url", "http://fake-sanctions")
+    with patch("httpx.post") as m:
+        m.return_value = Mock(
+            status_code=200,
+            json=lambda: {"verified": True, "company_status": "Active"}
+            if m.call_count == 1 else {"hit": True, "lists": ["UN"]},
+        )
+        result = enrich("family_office", {"客户姓名或实体名称": "陳大文家族辦公室", "受益所有人": "陳大文"})
+        assert result["provider"] == "icris+sanctions"
+        assert result["icris_verified"] is True
+        assert result["sanctions_hit"] is True
+        assert any("制裁名單命中" in f for f in result["flags"])

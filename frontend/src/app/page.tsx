@@ -19,8 +19,13 @@ interface Job {
   result: any | null;
   review_status?: string;
   review_note?: string;
-  submittedAt: number;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at?: string;
+  submittedAt?: number;
 }
+
+const PAGE_SIZE = 10;
 
 const SAMPLES: Record<string, string> = {
   insurance_hk:
@@ -53,7 +58,24 @@ export default function Home() {
   const [asyncMode, setAsyncMode] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [reviewer, setReviewer] = useState("");
   const timers = useRef<Record<string, any>>({});
+
+  async function loadJobs(f = statusFilter, p = page) {
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(p * PAGE_SIZE),
+    });
+    if (f) params.set("status", f);
+    const res = await fetch(`/api/v1/jobs?${params.toString()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setJobs(data.jobs || []);
+    setTotal(data.count || 0);
+  }
 
   useEffect(() => {
     fetch("/api/health")
@@ -65,34 +87,33 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    loadJobs(statusFilter, page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, page]);
+
+  const loadRef = useRef(loadJobs);
+  useEffect(() => {
+    loadRef.current = loadJobs;
+  });
+  useEffect(() => {
+    const t = setInterval(() => loadRef.current(), 5000); // 周期刷新：异步状态/多端同步
+    return () => clearInterval(t);
+  }, []);
+
   async function submit() {
     const body = JSON.stringify({ vertical, text });
-    if (asyncMode) {
-      const res = await fetch("/api/v1/intake/async", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-      const job = await res.json();
-      setJobs((j) => [
-        { id: job.id, vertical, status: job.status, result: null, submittedAt: Date.now() },
-        ...j,
-      ]);
-      setSelected(job.id);
-      poll(job.id);
-    } else {
-      const res = await fetch("/api/v1/intake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-      const job = await res.json();
-      setJobs((j) => [
-        { id: job.id, vertical, status: job.status, result: job.result, submittedAt: Date.now() },
-        ...j,
-      ]);
-      setSelected(job.id);
-    }
+    const url = asyncMode ? "/api/v1/intake/async" : "/api/v1/intake";
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const job = await res.json();
+    setSelected(job.id);
+    setPage(0);
+    await loadJobs(statusFilter, 0);
+    if (asyncMode) poll(job.id);
   }
 
   function poll(id: string) {
@@ -114,13 +135,21 @@ export default function Home() {
     const res = await fetch(`/api/v1/jobs/${id}/review`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reviewer }),
     });
     if (!res.ok) return;
     const job = await res.json();
     setJobs((j) =>
       j.map((x) =>
-        x.id === id ? { ...x, review_status: job.review_status, review_note: job.review_note } : x
+        x.id === id
+          ? {
+              ...x,
+              review_status: job.review_status,
+              review_note: job.review_note,
+              reviewed_by: job.reviewed_by,
+              reviewed_at: job.reviewed_at,
+            }
+          : x
       )
     );
   }
@@ -186,9 +215,47 @@ export default function Home() {
 
         {/* 右：审批看板 */}
         <Grid item xs={12} md={7}>
-          <Typography variant="h6" gutterBottom>
-            作业看板
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="h6">作业看板</Typography>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>状态筛选</InputLabel>
+              <Select
+                label="状态筛选"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <MenuItem value="">全部</MenuItem>
+                <MenuItem value="queued">queued</MenuItem>
+                <MenuItem value="processing">processing</MenuItem>
+                <MenuItem value="completed">completed</MenuItem>
+                <MenuItem value="failed">failed</MenuItem>
+              </Select>
+            </FormControl>
+            <Button size="small" onClick={() => loadJobs()}>
+              刷新
+            </Button>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              共 {total} 条
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button size="small" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                上一页
+              </Button>
+              <Typography variant="caption">第 {page + 1} 页</Typography>
+              <Button
+                size="small"
+                disabled={(page + 1) * PAGE_SIZE >= total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                下一页
+              </Button>
+            </Stack>
+          </Stack>
           <Grid container spacing={1}>
             {jobs.length === 0 && (
               <Typography variant="body2" color="text.secondary">
@@ -240,7 +307,15 @@ export default function Home() {
         <Paper sx={{ p: 2, mt: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">处理结果 · {sel.id}</Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                size="small"
+                label="审批人"
+                placeholder="manual"
+                value={reviewer}
+                onChange={(e) => setReviewer(e.target.value)}
+                sx={{ width: 140 }}
+              />
               <Button
                 size="small"
                 variant="outlined"
@@ -263,6 +338,13 @@ export default function Home() {
               </Button>
             </Stack>
           </Stack>
+          {sel.review_status && (
+            <Typography variant="caption" color="text.secondary">
+              审批结论：{sel.review_status === "approved" ? "已通过" : "已驳回"} · 审批人：
+              {sel.reviewed_by || "manual"}
+              {sel.reviewed_at ? ` · 时间：${new Date(sel.reviewed_at).toLocaleString()}` : ""}
+            </Typography>
+          )}
 
           {!sel.result ? (
             <Typography sx={{ mt: 1 }} color="text.secondary">
