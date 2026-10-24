@@ -1,19 +1,27 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Providers from "./providers";
+import { DEFAULT_LOCALE, htmlLang, metaFor } from "./i18n-meta";
 
-export const metadata: Metadata = {
-  title: "Ceron — Underwriting automation for Hong Kong finance",
-  description:
-    "Ceron turns raw submissions into auditable decisions for Hong Kong insurance, trusts and family offices: bilingual extraction, ICRIS / credit bureau enrichment, and SFC / HKMA / MPFA compliance gates.",
-};
+// 语言写在 cookie（ceron.locale）里，服务端据此输出对应语言的 title / description / lang，
+// 让分享链接与爬虫拿到的是当前语言版本的元数据。
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = cookies().get("ceron.locale")?.value || DEFAULT_LOCALE;
+  const meta = metaFor(locale);
+  return {
+    title: meta.title,
+    description: meta.description,
+  };
+}
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = cookies().get("ceron.locale")?.value || DEFAULT_LOCALE;
   return (
-    <html lang="zh-HK">
+    <html lang={htmlLang(locale)}>
       <body>
         <Providers>{children}</Providers>
       </body>

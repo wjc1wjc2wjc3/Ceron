@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { htmlLang, metaFor } from "./i18n-meta";
 
 export type Locale = "zh-HK" | "en" | "zh-CN";
 
@@ -943,11 +944,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 同步 <html lang>，让浏览器/读屏器与所选语言一致。
+  // 同步 <html lang> 与 <title>/<meta description>，让浏览器、读屏器、分享链接与所选语言一致。
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.lang = locale === "zh-CN" ? "zh-Hans" : locale;
+    if (typeof document === "undefined") return;
+    document.documentElement.lang = htmlLang(locale);
+    const meta = metaFor(locale);
+    document.title = meta.title;
+    let tag = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (!tag) {
+      tag = document.createElement("meta");
+      tag.setAttribute("name", "description");
+      document.head.appendChild(tag);
     }
+    tag.setAttribute("content", meta.description);
   }, [locale]);
 
   const t = (key: string) => dict[locale][key] ?? dict["zh-HK"][key] ?? key;
