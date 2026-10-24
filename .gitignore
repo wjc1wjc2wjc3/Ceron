@@ -15,6 +15,7 @@ node_modules/
 out/
 npm-debug.log*
 yarn-error.log*
+dev.log
 
 # ===== Go build artifacts =====
 ceron-gateway
