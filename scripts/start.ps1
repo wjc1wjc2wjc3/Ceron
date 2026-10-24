@@ -37,16 +37,16 @@ Write-Host "[ceron] starting python-svc :$PyPort ..." -ForegroundColor Cyan
 try {
   $venv = Join-Path $PyDir ".venv"
   if (-not (Test-Path $venv)) {
-    if (-not $SkipInstall) { & python -m venv $venv | Out-Null }
+    if (-not $SkipInstall) { & py -m venv $venv | Out-Null }
   }
   if (-not $SkipInstall -and (Test-Path (Join-Path $venv "Scripts/pip.exe"))) {
     & (Join-Path $venv "Scripts/pip.exe") install -q -r (Join-Path $PyDir "requirements.txt") | Out-Null
   }
   $pyExe = if (Test-Path (Join-Path $venv "Scripts/python.exe")) {
     Join-Path $venv "Scripts/python.exe"
-  } else { "python" }
+  } else { "py" }
   if (-not (Get-Command $pyExe -ErrorAction SilentlyContinue)) {
-    throw "python interpreter not found ($pyExe)"
+    throw "python interpreter not found (try: py -m pip install -r requirements.txt)"
   }
   $p = Start-Process -FilePath $pyExe -WorkingDirectory $PyDir `
     -ArgumentList "-m","uvicorn","app.main:app","--host","0.0.0.0","--port","$PyPort","--reload" `

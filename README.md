@@ -1,5 +1,13 @@
 # Ceron — 香港金融业承保与合规自动化平台（Go + Python 混合架构）
 
+![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-pytest%2031%20pass-brightgreen)
+
+> **English**: Ceron is an underwriting & compliance automation platform for Hong Kong financial institutions (insurance, trusts, family offices) — multi-channel intake (API / WhatsApp / WeCom), bilingual document extraction, pluggable data enrichment (ICRIS / Land Search / credit bureau / OFAC / HMT / CRS), decisioning with SFC/HKMA/MPFA compliance gates, ongoing monitoring, SAR filing and regulatory MI reporting.
+
 Ceron 是面向香港**中小企业金融与保险业**的承保（underwriting）与合规自动化平台。目标客户为香港的**港股保险、信托、家族办公室 / 家族资产**等金融机构。
 
 架构采用**前后端分层、按职责选语言**：
