@@ -1,6 +1,6 @@
 """决策服务（Decisioning）：风险评分 + 合規閘口，输出审批建议。
 
-对应 Heron 的 decisioning：按客戶政策跑檢查，輸出通过/拒绝/转人工及理由。
+决策引擎：按客户政策跑检查，输出通过/拒绝/转人工及理由。
 """
 from typing import Any
 

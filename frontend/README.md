@@ -1,6 +1,6 @@
 # Ceron Frontend
 
-Heron 香港本土化项目的前端控制台，采用 **Next.js 14 (App Router) + React + TypeScript + MUI**。
+Ceron 项目的前端控制台，采用 **Next.js 14 (App Router) + React + TypeScript + MUI**。
 
 通过 `/api/*` 反向代理到 **Go 网关**（`backend/go-svc`，默认 `http://localhost:8080`；容器内为 `go-svc:8080`）。
 

@@ -19,7 +19,7 @@ from app.ocr import get_ocr_provider
 from app.schemas import Vertical
 
 app = FastAPI(title="Ceron Intelligence Service", version="0.3.0",
-              description="Heron 产品的香港金融业本土化：Python 大模型智能服务层")
+              description="香港金融业承保与合规自动化的 Python 大模型智能服务层")
 
 
 class ExtractReq(BaseModel):

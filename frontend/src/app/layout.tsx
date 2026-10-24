@@ -3,7 +3,7 @@ import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Ceron 控制台",
-  description: "Heron 产品的香港金融业本土化前端",
+  description: "香港金融业承保与合规自动化前端控制台",
 };
 
 export default function RootLayout({
