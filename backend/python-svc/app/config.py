@@ -26,12 +26,23 @@ class Settings:
     azure_form_endpoint: str = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT", "")
     azure_form_key: str = os.getenv("AZURE_FORM_RECOGNIZER_KEY", "")
     # ===== Enrichment（富集数据源）=====
-    # mock | icris | sanctions
+    # mock | icris | sanctions（遗留单源选择）
     enrichment_provider: str = os.getenv("ENRICHMENT_PROVIDER", "mock")
     icris_api_url: str = os.getenv("ICRIS_API_URL", "")
     icris_api_key: str = os.getenv("ICRIS_API_KEY", "")
     sanctions_api_url: str = os.getenv("SANCTIONS_API_URL", "")
     sanctions_api_key: str = os.getenv("SANCTIONS_API_KEY", "")
+    # 优先级 1 新增数据源（配置对应 API_URL 即启用，失败自动降级人工复核）
+    land_search_api_url: str = os.getenv("LAND_SEARCH_API_URL", "")
+    land_search_api_key: str = os.getenv("LAND_SEARCH_API_KEY", "")
+    credit_bureau_api_url: str = os.getenv("CREDIT_BUREAU_API_URL", "")
+    credit_bureau_api_key: str = os.getenv("CREDIT_BUREAU_API_KEY", "")
+    ofac_api_url: str = os.getenv("OFAC_API_URL", "")
+    ofac_api_key: str = os.getenv("OFAC_API_KEY", "")
+    hmt_api_url: str = os.getenv("HMT_API_URL", "")
+    hmt_api_key: str = os.getenv("HMT_API_KEY", "")
+    crs_api_url: str = os.getenv("CRS_API_URL", "")
+    crs_api_key: str = os.getenv("CRS_API_KEY", "")
 
 
 settings = Settings()

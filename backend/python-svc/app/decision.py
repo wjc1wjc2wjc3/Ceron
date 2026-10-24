@@ -200,6 +200,30 @@ def assess(
                "PEP: enhanced due diligence required.",
                "PEP：需加强尽调。")
         )
+    if enrichment.get("credit_adverse"):
+        risk_score += 30
+        reasons.append(
+            tr(locale,
+               "信貸局不利紀錄：需加強審查。",
+               "Adverse credit-bureau record: enhanced review required.",
+               "信贷局不利记录：需加强审查。")
+        )
+    if enrichment.get("land_unresolved"):
+        risk_score += 20
+        reasons.append(
+            tr(locale,
+               "土地註冊查冊未明：產權核實必要。",
+               "Land search unresolved; property title verification required.",
+               "土地注册查册未明：产权核实必要。")
+        )
+    if enrichment.get("crs_issue"):
+        risk_score += 15
+        reasons.append(
+            tr(locale,
+               "CRS/FATCA 稅務居民狀態異常。",
+               "CRS/FATCA tax-residency status anomaly.",
+               "CRS/FATCA 税务居民状态异常。")
+        )
 
     if not reasons:
         reasons.append(
