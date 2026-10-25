@@ -4,11 +4,32 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Divider, Grid, Link as MuiLink, Stack, TextField, Typography,
+  Alert, Box, Button, Checkbox, Divider, FormControlLabel, Grid, Link as MuiLink, Stack, TextField, Typography,
 } from "@mui/material";
 import AuthBrandPanel from "../../components/AuthBrandPanel";
 import { useAuth } from "../../components/AuthProvider";
 import { I18nProvider, LanguageSwitcher, useT } from "../i18n";
+
+const REMEMBER_KEY = "ceron_credentials";
+
+/** 记住账号和密码：写入本地 JSON；读取用于预填。仅前端便利，凭据以明文存于 localStorage。 */
+function saveCredentials(email: string, password: string) {
+  try {
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, password }));
+  } catch { /* 隐私模式等场景忽略 */ }
+}
+function clearCredentials() {
+  try { localStorage.removeItem(REMEMBER_KEY); } catch { /* ignore */ }
+}
+function readCredentials(): { email: string; password: string } | null {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (v && typeof v.email === "string" && typeof v.password === "string") return v;
+  } catch { /* ignore */ }
+  return null;
+}
 
 function LoginForm() {
   const { t, tf } = useT();
@@ -19,8 +40,19 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true); // 默认选中：记住账号和密码
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // 启动时若存在已保存凭据，预填并默认勾选“记住”
+  useEffect(() => {
+    const saved = readCredentials();
+    if (saved) {
+      setEmail(saved.email);
+      setPassword(saved.password);
+      setRemember(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (user) router.replace(next);
@@ -32,6 +64,8 @@ function LoginForm() {
     setError("");
     try {
       await login(email, password);
+      if (remember) saveCredentials(email, password);
+      else clearCredentials();
       router.replace(next);
     } catch (err: any) {
       setError(err?.message || "login_failed");
@@ -94,6 +128,18 @@ function LoginForm() {
               <TextField
                 label={t("password")} type="password" value={password} required fullWidth
                 onChange={(e) => setPassword(e.target.value)}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    size="small"
+                    sx={{ color: "#1f4dff", "&.Mui-checked": { color: "#1f4dff" } }}
+                  />
+                }
+                label={t("rememberMe")}
+                sx={{ alignSelf: "flex-start", mt: -1 }}
               />
               <Button type="submit" variant="contained" size="large" disabled={busy} fullWidth>
                 {busy ? t("signingIn") : t("signIn")}
