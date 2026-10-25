@@ -60,6 +60,8 @@ class Settings:
     # 指向 JSON 配置文件：覆盖/扩展既有业务线字段，或定义全新业务线；
     # 未配置时使用内置 pydantic schema，行为不变。
     schema_config: str = os.getenv("SCHEMA_CONFIG", "")
+    # 法规速检语料（RAG 引用来源）；留空用 data/regulations.json
+    regulations_path: str = os.getenv("REGULATIONS_PATH", "")
     # ===== 优先级 3：持续监控（Ongoing Monitoring）=====
     # 是否启用后台周期性重查调度（默认关闭；生产建议开启以符合持续尽职要求）
     monitoring_enabled: bool = str(os.getenv("MONITORING_ENABLED", "false")).lower() == "true"

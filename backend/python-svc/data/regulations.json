@@ -1,0 +1,149 @@
+{
+  "_说明": "法规速检语料（供 RAG 引用）。内容为**团队内部摘要/工作底稿，非官方法规原文**，用于给 Agent 回答与审计包标注监管依据出处；正式合规判断请对照监管机构官方文本。",
+  "clauses": [
+    {
+      "id": "SFC-SUIT-01",
+      "source": "SFC 證監會",
+      "verticals": ["securities_suitability"],
+      "gates": ["SFC"],
+      "title": "適合性評估",
+      "text": "向客戶作出建議或招攬時，須確保該建議對該客戶而言在所有情況下均屬合理適合，考慮因素包括客戶的財務狀況、投資經驗及投資目標；須以書面紀錄依據。",
+      "en": "Suitability: recommendations must be reasonable having regard to the client's financial situation, investment experience and objectives, documented in writing."
+    },
+    {
+      "id": "SFC-FUND-01",
+      "source": "SFC 證監會",
+      "verticals": ["securities_suitability", "fund_ofc_lpf"],
+      "gates": ["SFC"],
+      "title": "向公眾銷售的基金須認可",
+      "text": "未經證監會認可的集合投資計劃，不得向香港公眾作出邀約；零售基金的文件與銷售限制適用於所有中介人。",
+      "en": "A collective investment scheme must be authorised by the SFC before being offered to the Hong Kong public."
+    },
+    {
+      "id": "OFC-LPF-01",
+      "source": "公司註冊處 / 證監會",
+      "verticals": ["fund_ofc_lpf"],
+      "gates": ["SFC", "CDD"],
+      "title": "基金設立與負責人要求",
+      "text": "開放式基金型公司（OFC）與有限合伙基金（LPF）須完成註冊/認可，並具備合資格的負責人、託管人與審計安排，另須履行持續申報義務。",
+      "en": "OFC and LPF vehicles require registration/authorisation with eligible responsible persons, custodian and audit arrangements plus ongoing filing duties."
+    },
+    {
+      "id": "HKMA-MTG-01",
+      "source": "HKMA 金管局",
+      "verticals": ["banking_mortgage"],
+      "gates": ["HKMA"],
+      "title": "按揭成數上限",
+      "text": "物業按揭貸款受逆周期宏觀審慎措施約束：按揭成數設有監管上限，並按物業是否自用、借款人是否已有按揭等因素調整。",
+      "en": "Loan-to-value ratio caps under HKMA countercyclical measures vary by property use and borrower's existing mortgage exposure."
+    },
+    {
+      "id": "HKMA-MTG-02",
+      "source": "HKMA 金管局",
+      "verticals": ["banking_mortgage"],
+      "gates": ["HKMA"],
+      "title": "供款與入息比率",
+      "text": "按揭審批須評估借款人的供款與入息比率（DSR），並就利率上升情景作壓力測試，確保還款能力不依賴抵押品價值。",
+      "en": "Mortgage underwriting must assess debt-service-to-income ratio with an interest-rate stress test, not relying on collateral value."
+    },
+    {
+      "id": "AMLO-CDD-01",
+      "source": "AMLO 打擊洗錢條例",
+      "verticals": ["*"],
+      "gates": ["AML", "CDD", "IA"],
+      "title": "客戶盡職審查",
+      "text": "金融機構須進行客戶盡職審查（CDD），辨識並核實客戶及其**實益擁有人**身份，了解業務關係目的，並以持續方式監察交易。",
+      "en": "Customer due diligence: identify and verify the customer and its beneficial owners, and monitor the relationship on an ongoing basis."
+    },
+    {
+      "id": "AMLO-EDD-01",
+      "source": "AMLO 打擊洗錢條例",
+      "verticals": ["*"],
+      "gates": ["AML", "CDD"],
+      "title": "政治公眾人物 / 高風險的加強盡調",
+      "text": "對政治公眾人物（PEP）、高風險司法管轄區或異常複雜架構，須採取**加強盡職審查**，並由高級管理層批准建立或延續業務關係。",
+      "en": "Enhanced due diligence and senior-management approval apply to PEPs, high-risk jurisdictions and unusually complex structures."
+    },
+    {
+      "id": "CDD-SOF-01",
+      "source": "AMLO / 行業指引",
+      "verticals": ["*"],
+      "gates": ["CDD", "AML"],
+      "title": "資金來源與財富來源",
+      "text": "須了解並在必要時核實客戶的**資金來源（SoF）與財富來源（SoW）**，尤其大額、跨境或非典型於其背景的交易；無法取得合理解釋時應暫緩並考慮申報。",
+      "en": "Understand and where necessary verify source of funds and source of wealth, especially for large, cross-border or atypical transactions."
+    },
+    {
+      "id": "AMLO-SAR-01",
+      "source": "AMLO 打擊洗錢條例",
+      "verticals": ["*"],
+      "gates": ["AML"],
+      "title": "可疑交易報告",
+      "text": "任何人知悉或懷疑任何財產為犯罪得益或與恐怖分子財產有關，須向聯合財富情報組（JFIU）提交可疑交易報告；不得向客戶透露（不得「通水」）。",
+      "en": "Suspicious transaction reports must be filed with the JFIU, and tipping off the customer is prohibited."
+    },
+    {
+      "id": "AMLO-SANCTION-01",
+      "source": "AMLO / 金融制裁",
+      "verticals": ["*"],
+      "gates": ["AML"],
+      "title": "制裁名單與恐怖分子財產無屏蔽",
+      "text": "須持續核對客戶是否名列相關制裁名單；一旦命中應即時凍結/拒絕交易，並向當局匯報，不得事先通知當事人。",
+      "en": "Screen customers against applicable sanctions lists; freeze/reject and report matches without tipping off."
+    },
+    {
+      "id": "MPFA-MPF-01",
+      "source": "MPFA 積金局",
+      "verticals": ["mpf"],
+      "gates": ["MPFA"],
+      "title": "強積金參加與供款",
+      "text": "僱主須安排合資格僱員於規定期限內參加强積金計劃並作出強制性供款，款項由核准受託人管理，僱主不得無故拖欠。",
+      "en": "Employers must enrol eligible employees and make mandatory MPF contributions to an approved trustee scheme."
+    },
+    {
+      "id": "MPFA-MPF-02",
+      "source": "MPFA 積金局",
+      "verticals": ["mpf"],
+      "gates": ["MPFA"],
+      "title": "強積金提取限制",
+      "text": "強積金累算權益一般須保存至法定退休年齡，僅在提早退休、永久離港、死亡、totally incapacity 等法定情況下方可提取。",
+      "en": "Preserved MPF benefits are generally withdrawable only upon statutory grounds such as early retirement or permanent departure."
+    },
+    {
+      "id": "IA-CLAIM-01",
+      "source": "IA 保監局",
+      "verticals": ["insurance_hk"],
+      "gates": ["IA"],
+      "title": "保險承保與理賠處理",
+      "text": "承保須依據保單條款與核保準則；處理索償應公平合理、具透明度，不得在無合理理由下拖延拒賠，並須核實是否涉及不保事項或道德風險。",
+      "en": "Underwrite per policy terms; handle claims fairly and transparently, verifying exclusions and moral-hazard indicators."
+    },
+    {
+      "id": "TRUST-TCSP-01",
+      "source": "公司註冊處 / AMLO",
+      "verticals": ["trust", "family_office"],
+      "gates": ["CDD", "AML"],
+      "title": "信託或公司服務提供者義務",
+      "text": "信託或公司服務提供者（TCSP）須領有牌照並符合「適當人選」準則，同時履行客戶盡職審查、備存紀錄與持續監察義務。",
+      "en": "Trust or company service providers must be licensed, fit and proper, and carry out CDD, record-keeping and ongoing monitoring."
+    },
+    {
+      "id": "CDD-STRUCTURE-01",
+      "source": "AMLO / 行業指引",
+      "verticals": ["trust", "family_office", "fund_ofc_lpf"],
+      "gates": ["CDD"],
+      "title": "複雜架構與代名安排",
+      "text": "多層持股、離岸架構、代名/受託持股須穿透至最終控制人並留存圖譜；出現循環持股或無法穿透時應升級盡調並暫緩交易。",
+      "en": "Layered structures and nominee holdings must be pierced to ultimate beneficial owners; circular or unresolvable ownership escalates to EDD."
+    },
+    {
+      "id": "PDPO-DATA-01",
+      "source": "PDPO 個人資料條例",
+      "verticals": ["*"],
+      "gates": ["DATA"],
+      "title": "個人資料保護",
+      "text": "收集個人資料須有合法目的並取得明確同意，保存期間不得超過實際需要，並須採取適當保安措施防止未經授權查閱。",
+      "en": "Collect personal data for lawful purposes with consent, retain no longer than necessary and safeguard against unauthorised access."
+    }
+  ]
+}

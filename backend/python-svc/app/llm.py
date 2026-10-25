@@ -95,3 +95,55 @@ class LLMClient:
                 json_mode_downgraded=degraded_json_mode,
             )
             return json.loads(content)
+
+    async def chat(self, prompt: str, system: str = "", trace: Optional[list] = None,
+                   want_json: bool = False) -> Optional[str]:
+        """自由文本对话补全（Agent 规划器 / 回答生成用）。
+
+        与 ``extract`` 的差别：返回原始字符串而非按 schema 解析的结果；
+        ``mock`` 或未配置密钥时返回 ``None``，由调用方回退到确定性策略
+        （保持「无 LLM 也能跑」的既有哲学）。异常一律吞掉返回 None。
+        """
+        import time
+
+        from app.trace import stamp
+
+        if self.provider == "mock" or not self.api_key:
+            stamp(trace, "agent", self.provider or "mock", started=time.perf_counter(), ok=True,
+                  model=self.model, fallback=True)
+            return None
+
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        payload: dict = {"model": self.model, "messages": messages}
+        if want_json and self.json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            t0 = time.perf_counter()
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json=payload,
+                )
+                if resp.status_code == 400 and payload.get("response_format"):
+                    payload.pop("response_format", None)
+                    resp = await client.post(
+                        f"{self.base_url}/chat/completions",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        json=payload,
+                    )
+                resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+                usage = (resp.json().get("usage") or {})
+                stamp(trace, "agent", self.provider or "openai-compatible", started=t0, ok=True,
+                      model=self.model, provider=self.provider,
+                      total_tokens=usage.get("total_tokens"))
+                return content.strip()
+        except Exception as e:  # LLM 不可用不阻断 Agent：回退确定性策略
+            stamp(trace, "agent", self.provider or "openai-compatible", ok=False, error=e,
+                  model=self.model)
+            return None

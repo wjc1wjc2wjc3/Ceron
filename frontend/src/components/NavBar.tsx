@@ -12,6 +12,7 @@ import { useAuth } from "./AuthProvider";
 
 const LINKS = [
   { href: "/app", key: "navWorkspace" },
+  { href: "/app/agent", key: "navAgent" },
   { href: "/app/compliance", key: "navCompliance" },
   { href: "/app/models", key: "navModels" },
   { href: "/products", key: "navProducts" },

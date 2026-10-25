@@ -80,6 +80,35 @@ def tools_list() -> list[dict]:
             "description": "导出当前生效的合规闸口规则包（可 diff、可交给合规审阅）。",
             "inputSchema": {"type": "object", "properties": {"version": {"type": "string"}}},
         },
+        {
+            "name": "ceron.kb_search",
+            "description": "检索香港/国际监管依据条文（SFC/HKMA/MPFA/AMLO/PDPO），返回带 source 的可引用出处。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "vertical": {"type": "string"},
+                    "gate": {"type": "string"},
+                    "top_k": {"type": "integer", "default": 3},
+                },
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "ceron.agent_chat",
+            "description": "合规 Agent 对话（规划→工具调用→反思），返回带监管引用的回答；session_id 用于多轮记忆。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "session_id": {"type": "string"},
+                    "vertical": {"type": "string"},
+                    "extracted": {"type": "object"},
+                    "locale": _LOC,
+                },
+                "required": ["message"],
+            },
+        },
     ]
 
 
@@ -107,6 +136,18 @@ async def call_tool(name: str, arguments: dict | None = None) -> dict:
 
     if name == "ceron.rules":
         return rules.export(args.get("version"))
+
+    if name == "ceron.kb_search":
+        from app import kb
+        return {"clauses": kb.search(args.get("query", ""), top_k=int(args.get("top_k") or 3),
+                                     vertical=args.get("vertical"), gate=args.get("gate"))}
+
+    if name == "ceron.agent_chat":
+        from app import agent
+        return await agent.chat(
+            args.get("message", ""), session_id=args.get("session_id"),
+            vertical=args.get("vertical"), extracted=args.get("extracted"), locale=locale,
+        )
 
     raise KeyError(f"unknown tool: {name}")
 

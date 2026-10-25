@@ -159,7 +159,12 @@ def test_ownership_edges_flow_through_pipeline():
 def test_mcp_tools_list_and_call():
     tools = client.get("/v1/mcp/tools").json()["tools"]
     names = {t["name"] for t in tools}
-    assert {"ceron.extract", "ceron.enrich", "ceron.decide", "ceron.ubo", "ceron.rules"} == names
+    # 工具集随能力扩展增长（新增 kb_search / agent_chat），断言「必须包含」而非固定集合
+    required = {
+        "ceron.extract", "ceron.enrich", "ceron.decide", "ceron.ubo", "ceron.rules",
+        "ceron.kb_search", "ceron.agent_chat",
+    }
+    assert required <= names
 
     rpc = client.post("/v1/mcp", json={
         "jsonrpc": "2.0", "id": 1, "method": "tools/call",

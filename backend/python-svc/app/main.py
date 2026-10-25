@@ -16,7 +16,8 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from app import auth, llm, llm_catalog, mcp, rules
+from app import agent, auth, kb, llm, llm_catalog, mcp, rules
+from app.kb import search as kb_search
 from app.capabilities import snapshot as capabilities_snapshot
 from app.compliance import check_data_residency
 from app.config import settings
@@ -80,6 +81,15 @@ class SarReq(BaseModel):
     vertical: str = ""
     reason: str = ""
     decision_summary: dict = {}
+
+
+class AgentChatReq(BaseModel):
+    """合规 Agent 一轮对话。session_id 留空则自动新建会话（多轮追问请带上）。"""
+    message: str
+    session_id: Optional[str] = None
+    vertical: Optional[str] = None
+    extracted: dict = {}
+    locale: str = "zh-HK"
 
 
 @app.on_event("startup")
@@ -288,6 +298,43 @@ def run_audit(run_id: str):
         "trace": run.get("trace", []),
         "trace_summary": summary(run.get("trace", [])),
     }
+
+
+@app.post("/v1/kb/search")
+def kb_search_endpoint(body: dict):
+    """法规速检：检索可引用的监管依据（内部摘要，非官方法规原文）。"""
+    return {
+        "query": body.get("query", ""),
+        "clauses": kb_search(body.get("query", ""), top_k=int(body.get("top_k") or 5),
+                             vertical=body.get("vertical"), gate=body.get("gate")),
+    }
+
+
+@app.post("/v1/agent/chat")
+async def agent_chat_endpoint(req: AgentChatReq):
+    """合规 Agent 对话：规划 → 工具调用 → 反思，返回带监管引用与工具轨迹的回答。"""
+    trace = new_trace()
+    out = await agent.chat(
+        req.message, session_id=req.session_id, vertical=req.vertical,
+        extracted=req.extracted, locale=req.locale, trace=trace,
+    )
+    return out
+
+
+@app.get("/v1/agent/session/{session_id}")
+def agent_session(session_id: str):
+    """查看多轮会话记忆（Audit 要求：Agent 说过的话必须可回溯）。"""
+    hist = agent.get_session(session_id)
+    if hist is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return {"session_id": session_id, "messages": hist}
+
+
+@app.delete("/v1/agent/session/{session_id}")
+def agent_session_delete(session_id: str):
+    if not agent.delete_session(session_id):
+        raise HTTPException(status_code=404, detail="session not found")
+    return {"ok": True}
 
 
 @app.get("/v1/parsers")
