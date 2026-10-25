@@ -204,6 +204,37 @@ def monitoring_alerts():
     return {"alerts": store.list_alerts()}
 
 
+@app.patch("/v1/monitoring/alerts/{alert_id}")
+def monitoring_alert_status(alert_id: str, body: dict):
+    """告警处置：open → acknowledged（已认领）→ resolved（已结案）。"""
+    status = body.get("status")
+    if status not in ("open", "acknowledged", "resolved"):
+        raise HTTPException(status_code=400, detail="invalid status")
+    updated = store.update_alert(alert_id, status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="alert not found")
+    return updated
+
+
+@app.post("/v1/monitoring/alerts/{alert_id}/sar")
+def monitoring_alert_to_sar(alert_id: str):
+    """从告警一键起草 SAR：把「发现 → 申报」两步串成一跳，避免人工漏报。"""
+    alert = None
+    for a in store.list_alerts():
+        if str(a.get("id")) == str(alert_id):
+            alert = a
+            break
+    if not alert:
+        raise HTTPException(status_code=404, detail="alert not found")
+    sar = create_sar(
+        alert.get("name", ""), alert.get("vertical", ""),
+        f"{alert.get('reason','')}（名单：{(alert.get('lists') or []) }）",
+        {"source": "monitoring_alert", "alert_id": str(alert_id)},
+    )
+    store.update_alert(alert_id, "acknowledged")
+    return sar
+
+
 @app.post("/v1/sar")
 def sar_create(req: SarReq):
     """创建一份 SAR 草稿（高风险决策应触发 SAR 申报评估）。"""

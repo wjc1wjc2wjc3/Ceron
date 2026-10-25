@@ -241,6 +241,19 @@ class PostgresBackend:
             rows = cur.fetchall()
         return [{"id": r[0], "ts": _iso(r[1]), "status": r[2], **(r[3] or {})} for r in rows]
 
+    def update_alert(self, alert_id, status):
+        """告警处置：open → acknowledged → resolved（运营收件箱的状态流转）。"""
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE monitoring_alerts SET status=%s WHERE id=%s", (status, alert_id))
+            if cur.rowcount == 0:
+                return None
+            cur.execute("SELECT id, ts, name, reason, lists, status "
+                        "FROM monitoring_alerts WHERE id=%s", (alert_id,))
+            r = cur.fetchone()
+        return {"id": r[0], "ts": _iso(r[1]), "name": r[2], "reason": r[3],
+                "lists": r[4] or [], "status": r[5]}
+
     def update_sar(self, sar_id, status):
         with self._conn() as conn:
             cur = conn.cursor()
@@ -510,6 +523,17 @@ def list_sars() -> list[dict]:
         return _pg.list_sars()
     with _lock:
         return list(sars)
+
+
+def update_alert(alert_id, status: str) -> Optional[dict]:
+    if _pg is not None:
+        return _pg.update_alert(alert_id, status)
+    with _lock:
+        for a in alerts:
+            if str(a["id"]) == str(alert_id):  # 内存后端 id 可能是 int
+                a["status"] = status
+                return a
+        return None
 
 
 def update_sar(sar_id: str, status: str) -> Optional[dict]:
