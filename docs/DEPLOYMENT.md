@@ -2,7 +2,7 @@
 
 适用组件：`backend/python-svc`（FastAPI 智能服务）、`backend/go-svc`（Go 网关/编排）、`frontend`（Next.js 控制台）。
 
-数据流：`frontend :3000 → go-svc :8080 → python-svc :8000`
+数据流：`frontend :3000 → go-svc :8080 → python-svc :8001`（宿主侧；容器内 python-svc 仍为 8000）
 
 部署产物目录 `deploy/`：
 - `deploy/nginx/ceron.conf` — Nginx 反代 + TLS 站点配置
@@ -46,18 +46,18 @@ cd Ceron
 docker compose up --build -d
 ```
 - Windows/macOS：安装 Docker Desktop 后直接执行；Linux 安装 Docker Engine。
-- 验证：frontend `http://localhost:3000`；go-svc `curl http://localhost:8080/health`；python-svc `curl http://localhost:8000/health`。
+- 验证：frontend `http://localhost:3000`；go-svc `curl http://localhost:8080/health`；python-svc `curl http://localhost:8001/health`。
 - 停止：`docker compose down`；更新：`docker compose up --build -d`。
 
 ### 3.2 单容器手动运行（便于排错 / 指定 registry）
 ```bash
 # python-svc
-docker run -d --name python-svc -p 8000:8000 \
+docker run -d --name python-svc -p 8001:8000 \
   -e LLM_PROVIDER=mock -e DATA_REGION=hk ceron/python-svc:latest
 
 # go-svc（需能访问 python-svc 地址；同主机用宿主 IP 或 --network）
 docker run -d --name go-svc -p 8080:8080 \
-  -e PYTHON_SVC_URL=http://<python-host>:8000 -e GO_SVC_PORT=8080 \
+  -e PYTHON_SVC_URL=http://<python-host>:8001 -e GO_SVC_PORT=8080 \
   -e WORKERS=4 ceron/go-svc:latest
 
 # frontend
@@ -74,7 +74,7 @@ docker run -d --name frontend -p 3000:3000 \
 ```bash
 docker build -t ceron/go-svc:latest -f backend/go-svc/Dockerfile backend/go-svc
 docker run -d --name go-svc -p 8080:8080 --link postgres --link nats \
-  -e PYTHON_SVC_URL=http://<python-host>:8000 \
+  -e PYTHON_SVC_URL=http://<python-host>:8001 \
   -e DATABASE_URL=postgres://ceron:ceron@postgres:5432/ceron?sslmode=disable \
   -e NATS_URL=nats://nats:4222 \
   ceron/go-svc:latest
@@ -109,13 +109,13 @@ py -3 -m venv .venv                 # macOS/Linux: python3 -m venv .venv
 # Windows: .venv\Scripts\activate   macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env                # Windows 用 copy
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 **Windows 服务化（NSSM）**
 ```powershell
 choco install nssm
-nssm install CeronPython "C:\...\backend\python-svc\.venv\Scripts\uvicorn.exe" "app.main:app --host 0.0.0.0 --port 8000"
+nssm install CeronPython "C:\...\backend\python-svc\.venv\Scripts\uvicorn.exe" "app.main:app --host 0.0.0.0 --port 8001"
 nssm set CeronPython AppDirectory "C:\...\backend\python-svc"
 nssm start CeronPython
 ```
@@ -131,7 +131,7 @@ nssm start CeronPython
   <key>ProgramArguments</key><array>
     <string>/path/to/Ceron/backend/python-svc/.venv/bin/uvicorn</string>
     <string>app.main:app</string><string>--host</string><string>0.0.0.0</string>
-    <string>--port</string><string>8000</string>
+    <string>--port</string><string>8001</string>
   </array>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 </dict></plist>
@@ -147,7 +147,7 @@ After=network.target
 [Service]
 WorkingDirectory=/opt/ceron/backend/python-svc
 EnvironmentFile=/opt/ceron/backend/python-svc/.env
-ExecStart=/opt/ceron/backend/python-svc/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+ExecStart=/opt/ceron/backend/python-svc/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001
 Restart=always
 User=ceron
 
@@ -161,7 +161,7 @@ WantedBy=multi-user.target
 cd backend/go-svc
 go build -o ceron-gateway ./cmd/server     # Windows 产物为 ceron-gateway.exe
 # 环境变量（各 OS 均需设置）：
-#   PYTHON_SVC_URL=http://localhost:8000  GO_SVC_PORT=8080  WORKERS=4  CRM_WEBHOOK_URL=
+#   PYTHON_SVC_URL=http://localhost:8001  GO_SVC_PORT=8080  WORKERS=4  CRM_WEBHOOK_URL=
 ./ceron-gateway
 ```
 - **Windows（NSSM）**：`nssm install CeronGateway "C:\...\ceron-gateway.exe"`，并在 `AppEnvironment` 加入上述变量。
@@ -297,7 +297,7 @@ YAML
 | 现象 | 原因/处理 |
 |---|---|
 | go-svc 报连接 python 失败 | `PYTHON_SVC_URL` 未设或 python-svc 未启动；K8s 内应写为 `http://python-svc:8000` |
-| 端口被占用（8000/8080/3000） | 杀掉占用进程或改端口（`GO_SVC_PORT`/compose ports） |
+| 端口被占用（8001/8080/3000） | 杀掉占用进程或改端口（`GO_SVC_PORT`/compose ports）。注意宿主 8000 是 AiToken 后端，不要占用；两个进程同绑 8000 时 Windows 上会静默共存（各占 127.0.0.1 / 0.0.0.0），更具体的 127.0.0.1 绑定会抢走请求，且**没有任何报错**。 |
 | mock 模式抽取不全 | 正常：正则兜底有限；配置 `LLM_API_KEY` 后由大模型抽取 |
 | OCR/富集报「缺少配置」 | 对应 `OCR_PROVIDER`/`ENRICHMENT_PROVIDER` 的 URL/KEY 未配置 |
 | Windows 下 go run 提示文件被占用 | 旧进程未退出：结束 `ceron-gateway.exe`/`go.exe` 后重试 |

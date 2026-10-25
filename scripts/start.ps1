@@ -1,5 +1,5 @@
 # Ceron one-click local launcher (Windows / PowerShell)
-# Starts python-svc(8000) -> go-svc(8080) -> frontend(3000), Ctrl+C stops all.
+# Starts python-svc(8001) -> go-svc(8080) -> frontend(3000), Ctrl+C stops all.
 param(
   [switch]$NoBrowser,   # do not open browser
   [switch]$SkipInstall  # skip dependency install (venv / npm install)
@@ -10,7 +10,10 @@ $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PyDir  = Join-Path $Root "backend/python-svc"
 $GoDir  = Join-Path $Root "backend/go-svc"
 $FeDir  = Join-Path $Root "frontend"
-$PyPort = 8000; $GoPort = 8080; $FePort = 3000
+# 8001 而非 8000：8000 是 AiToken 后端（AiTokenWhole/AiTokenBackend）的端口，
+# 两者都绑 8000 时 Windows 上会静默共存（各占 127.0.0.1 / 0.0.0.0），
+# 更具体的 127.0.0.1 绑定会把请求抢走，导致 AiToken 前端登录 404 且无任何报错。
+$PyPort = 8001; $GoPort = 8080; $FePort = 3000
 
 $env:PYTHON_SVC_URL = "http://localhost:$PyPort"
 $env:GO_SVC_PORT    = "$GoPort"

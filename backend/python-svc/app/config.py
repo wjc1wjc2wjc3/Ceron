@@ -75,7 +75,10 @@ class Settings:
     auth_secret: str = os.getenv("AUTH_SECRET", "ceron-dev-secret-change-me")
     auth_token_ttl: int = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", str(7 * 24 * 3600)))
     # 前后端地址：OAuth 回调需要外网可达的绝对 URL
-    public_base_url: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    # 默认 8001 而非 8000：宿主 8000 留给 AiToken 后端（AiTokenWhole/AiTokenBackend）。
+    # 两者都绑 8000 时 Windows 上会静默共存（各占 127.0.0.1 / 0.0.0.0），
+    # 更具体的 127.0.0.1 绑定会把请求抢走，导致 AiToken 前端登录 404 且无任何报错。
+    public_base_url: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8001")
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     # X (Twitter) OAuth 2.0 App；配置 X_CLIENT_ID 即启用「使用 X 登录」
     x_client_id: str = os.getenv("X_CLIENT_ID", "")

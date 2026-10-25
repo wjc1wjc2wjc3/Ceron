@@ -35,7 +35,10 @@ services:
       - LLM_PROVIDER=mock
       - DATA_REGION=hk
     ports:
-      - "8000:8000"
+      # 宿主 8001 -> 容器 8000：宿主 8000 留给 AiToken 后端，避免 Windows 上
+      # 两个进程静默共存（各占 127.0.0.1 / 0.0.0.0）导致请求被抢。
+      # 容器网络内 python-svc 仍是 8000，故 go-svc 的 PYTHON_SVC_URL 不用改。
+      - "8001:8000"
     depends_on:
       - postgres
 

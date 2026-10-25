@@ -35,7 +35,10 @@ func envInt(key string, fallback int) int {
 }
 
 func main() {
-	pyURL := env("PYTHON_SVC_URL", "http://localhost:8000")
+	// 默认 8001：8000 是 AiToken 后端（AiTokenWhole/AiTokenBackend）的端口，
+	// 两者都绑 8000 时 Windows 上会静默共存（各占 127.0.0.1 / 0.0.0.0），
+	// 更具体的 127.0.0.1 绑定会把请求抢走，导致 AiToken 前端登录 404 且无任何报错。
+	pyURL := env("PYTHON_SVC_URL", "http://localhost:8001")
 	port := env("GO_SVC_PORT", "8080")
 	workers := envInt("WORKERS", 4)
 	crmURL := os.Getenv("CRM_WEBHOOK_URL")

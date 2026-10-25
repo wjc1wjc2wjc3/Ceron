@@ -5,14 +5,14 @@
 ## 1. 服务拓扑
 
 ```
-frontend :3000  ──/api 反代──▶  go-svc :8080  ──REST──▶  python-svc :8000 ──▶ LLM/OCR/富集数据源
+frontend :3000  ──/api 反代──▶  go-svc :8080  ──REST──▶  python-svc :8001 ──▶ LLM/OCR/富集数据源
                                     │
                                     └─ OnComplete ─▶ CRM webhook（可选）
 ```
 
 | 服务 | 端口 | 健康检查 |
 |---|---|---|
-| python-svc | 8000 | `GET /health`（含数据驻留合规状态） |
+| python-svc | 8001 | `GET /health`（含数据驻留合规状态） |
 | go-svc | 8080 | `GET /health` |
 | frontend | 3000 | HTTP 200 |
 

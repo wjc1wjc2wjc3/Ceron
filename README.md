@@ -92,7 +92,7 @@ Ceron 定位为面向香港**中小企业金融与保险业**的**承保（under
 ```dotenv
 # python-svc（后端签发令牌）
 AUTH_SECRET=change-me-in-production
-PUBLIC_BASE_URL=http://localhost:8000
+PUBLIC_BASE_URL=http://localhost:8001
 FRONTEND_URL=http://localhost:3000
 X_CLIENT_ID=            # developer.x.com 创建 App
 X_CLIENT_SECRET=
@@ -240,7 +240,7 @@ uvicorn app.main:app --port 8000
 ### 后端 Go 网关/编排层
 ```bash
 cd backend/go-svc
-# PYTHON_SVC_URL=http://localhost:8000  WORKERS=4
+# PYTHON_SVC_URL=http://localhost:8001  WORKERS=4
 go run ./cmd/server           # 监听 :8080
 ```
 
@@ -251,7 +251,7 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 
 ### Docker 一键编排
 ```bash
-docker compose up --build    # 前端 :3000 → Go :8080 → Python :8000
+docker compose up --build    # 前端 :3000 → Go :8080 → Python :8001
 ```
 
 ### CI 与质量门禁

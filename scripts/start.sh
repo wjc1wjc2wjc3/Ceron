@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ceron 一键本地启动（macOS / Linux）
-# 依次拉起：python-svc(8000) → go-svc(8080) → frontend(3000)，Ctrl+C 一键停止全部。
+# 依次拉起：python-svc(8001) → go-svc(8080) → frontend(3000)，Ctrl+C 一键停止全部。
 # 用法：
 #   ./scripts/start.sh           # 首次会创建 venv 并安装依赖、npm install
 #   ./scripts/start.sh --skip-install   # 跳过依赖安装
@@ -11,7 +11,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY_DIR="$ROOT/backend/python-svc"
 GO_DIR="$ROOT/backend/go-svc"
 FE_DIR="$ROOT/frontend"
-PY_PORT=8000
+# 8001 而非 8000：8000 是 AiToken 后端（AiTokenWhole/AiTokenBackend）的端口，
+# 两者都绑 8000 时 Windows 上会静默共存（各占 127.0.0.1 / 0.0.0.0），
+# 更具体的 127.0.0.1 绑定会把请求抢走，导致 AiToken 前端登录 404 且无任何报错。
+PY_PORT=8001
 GO_PORT=8080
 FE_PORT=3000
 
