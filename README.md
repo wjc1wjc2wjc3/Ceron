@@ -260,11 +260,40 @@ cd backend/python-svc && py poc/bilingual_poc.py
 # 繁中/英文/family_office 三组样本的字段级准确率；配置 LLM_API_KEY 后重跑对比
 ```
 
+### 公开评测基准（6 业务线 × 三语）
+```bash
+cd backend/python-svc && py poc/benchmark.py --write
+# 字段级精确匹配；未配置密钥时为「规则兜底基线」（当前 63/63 = 100%），
+# 配置 LLM_API_KEY 后重跑即得真实模型准确率；结果写入 docs/eval/benchmark.json
+```
+
+## 能力覆盖度与合规治理（P0/P1）
+
+覆盖度数字由 `/v1/capabilities` 实时统计（前端 `/compare` 页直接引用，避免各处手写不一致）：
+
+| 维度 | 覆盖 |
+|---|---|
+| 业务线（Vertical） | **6**（insurance_hk / trust / family_office / banking_mortgage / securities_suitability / mpf / fund_ofc_lpf 中的全部枚举） |
+| 数据源 Provider | **7** 类已实现（ICRIS / 土地註冊處 / 信貸局 / 制裁服務 / OFAC / HMT / CRS），配置 `*_API_URL` 即启用、失败自动降级 |
+| 合规闸口规则 | **21** 条（SFC / HKMA / MPFA / AML-CFT），版本号 `RULE_PACK_VERSION=2026.10.1`，`GET /v1/rules` 可导出 diff 交给合规审阅 |
+| 模型预设 | **5** 家 + 自定义 OpenAI-compatible（DeepSeek / Kimi / GLM / Qwen / Doubao） |
+| 人工复核检查点 | **10** 个（CP-01…CP-10），四级分级：field（补件）→ source（人工取证）→ gate（合规判断）→ risk（签批） |
+| 语言 | 繁中 / English / 简体（界面、抽取、决策理由、审计包全链路） |
+
+治理能力（对标 marble / kyc-analyst 的可审计设计）：
+
+- **作业级 Trace（P1-2）**：`/v1/pipeline` 返回每一步用的模型、数据源、耗时、token 与降级记录（`trace` / `trace_summary`）。
+- **审计包导出（P0-4）**：`GET /v1/runs/{run_id}/audit` 一次拿齐 抽取字段 / 脱敏原文预览 / 富集信号 / 规则命中 / 决策理由 / UBO / trace，`schema_version=ceron-audit-1.0`；控制台 Jobs 页一键下载。
+- **HITL 分级（P1-4）**：`assess_with_review` 在决策里内嵌 review（gate 级命中可直接拒绝；source 级=数据源降级必须人工取证）。
+- **UBO 图穿透（P1-6）**：股权边相乘计算有效持股、识别循环持股；`POST /v1/ubo` / pipeline 内置。
+- **MCP 工具层（P1-5）**：`/v1/mcp/tools` + `/v1/mcp`（JSON-RPC 2.0），把 extract / enrich / decide / ubo / rules 暴露给任意 Agent（Dify / n8n / Claude）。
+- **可插拔解析器（P1-1）**：PaddleOCR / Docling（MIT）/ Marker / 内置兜底，`GET /v1/parsers` 查看可用性，未安装自动降级、绝不中断流水线。
+
 ---
 
 ## API 概要
 
-**Python 智能服务层**：`GET /health`；`POST /v1/ocr`（image_base64→文本）；`POST /v1/extract`；`POST /v1/enrich`；`POST /v1/decision`；`POST /v1/pipeline`（text 或 image_base64，串联 OCR→抽取→富集→决策）。`vertical` 取值：`insurance_hk`、`family_office`。
+**Python 智能服务层**：`GET /health`；`POST /v1/ocr`（image_base64→文本）；`POST /v1/extract`；`POST /v1/enrich`；`POST /v1/decision`；`POST /v1/pipeline`（text 或 image_base64，串联 OCR→抽取→富集→决策，返回 run_id / ubo / trace）；`GET /v1/capabilities`（覆盖度）；`GET /v1/rules`、`GET /v1/rules/version`（规则包导出）；`GET /v1/runs/{id}/audit`（审计包）；`GET /v1/parsers`、`POST /v1/parse`（可插拔解析）；`POST /v1/ubo`（图穿透）；`GET /v1/mcp/tools`、`POST /v1/mcp`（MCP JSON-RPC）。`vertical` 取值：`insurance_hk`、`trust`、`family_office`、`banking_mortgage`、`securities_suitability`、`mpf`、`fund_ofc_lpf`。
 
 **Go 网关**：`GET /health`；`POST /v1/intake`（同步）；`POST /v1/intake/async`（异步，202+轮询）；`POST /v1/ingest/whatsapp`、`POST /v1/ingest/wecom`（渠道收件，默认 insurance_hk）；`GET /v1/jobs?status=&limit=&offset=`（过滤+分页）、`GET /v1/jobs/{id}`；`PATCH /v1/jobs/{id}/review`（人工审批 approved/rejected，含审计：审批人/时间，持久化）；作业完成后自动回调 `CRM_WEBHOOK_URL`（如配置）。
 

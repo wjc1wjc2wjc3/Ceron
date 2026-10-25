@@ -32,3 +32,8 @@ Thumbs.db
 
 # ===== 一键启动脚本日志（scripts/start.* 输出）=====
 logs/
+
+# ===== 本地文档（营销稿/调研稿，永不提交）=====
+知乎推广软文-香港金融机构AI Agent落地.md
+知乎专栏长文-香港金融AI Agent落地.md
+竞品调研-香港金融AI Agent.md

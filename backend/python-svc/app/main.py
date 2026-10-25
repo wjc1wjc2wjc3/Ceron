@@ -16,18 +16,22 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from app import auth, llm, llm_catalog
+from app import auth, llm, llm_catalog, mcp, rules
+from app.capabilities import snapshot as capabilities_snapshot
 from app.compliance import check_data_residency
 from app.config import settings
-from app.decision import assess
+from app.decision import assess, assess_with_review
 from app.enrichment import enrich
 from app.extraction import extract_document
 from app.mi import build_mi_report
 from app.monitoring import run_scan, start_scheduler
 from app.ocr import get_ocr_provider
+from app.parsers import list_parsers, parse as parse_document
 from app.sar import create_sar, list_sars, set_status
 from app.schemas import Vertical
 from app import store
+from app.trace import new_trace, stamp, summary
+from app.ubo import resolve as resolve_ubo
 
 app = FastAPI(title="Ceron Intelligence Service", version="0.3.0",
               description="香港金融业承保与合规自动化的 Python 大模型智能服务层")
@@ -59,6 +63,15 @@ class PipelineReq(BaseModel):
     text: str = ""
     image_base64: str = ""
     locale: str = "zh-HK"
+    # 结构化股权边：[{"from":"A","to":"B","pct":60}]，供 UBO 图穿透使用（可选）
+    ownership_edges: list = []
+
+
+class ParseReq(BaseModel):
+    file_base64: str
+    filename: str = ""
+    locale: str = "zh-HK"
+    parser: Optional[str] = None
 
 
 class SarReq(BaseModel):
@@ -118,9 +131,18 @@ async def pipeline_endpoint(req: PipelineReq, authorization: Optional[str] = Hea
     payload = auth.verify_token(_token_from_header(authorization))
     if payload:
         cfg = llm_catalog.resolve(store.get_llm_config(payload.get("sub", "")))
-    res = await extract_document(text, req.vertical, cfg)
-    enrichment = enrich(req.vertical.value, res["extracted"], req.locale)
-    decision = assess(req.vertical, res["extracted"], enrichment, req.locale)
+
+    # 作业级 trace：记录每一步用的模型、数据源、耗时与成功与否（模型治理要求）
+    trace = new_trace()
+    res = await extract_document(text, req.vertical, cfg, trace=trace)
+    enrichment = enrich(req.vertical.value, res["extracted"], req.locale, trace=trace)
+    decision = assess_with_review(req.vertical, res["extracted"], enrichment, req.locale, trace=trace)
+
+    # UBO 穿透（家办 / 信托 / 基金场景）：股权图相乘计算有效持股
+    ubo = resolve_ubo(res["extracted"], req.ownership_edges)
+    stamp(trace, "ubo", "graph", ok=not ubo.get("unresolved", True),
+          mode=ubo.get("mode"), owners=len(ubo.get("beneficial_owners", [])))
+
     # 优先级 3：记录决策历史（供 MI）并登记实体（供持续监控）
     name = (
         res["extracted"].get("客户姓名或实体名称")
@@ -130,14 +152,30 @@ async def pipeline_endpoint(req: PipelineReq, authorization: Optional[str] = Hea
         or res["extracted"].get("基金名称或实体名称")
         or res["extracted"].get("受保人")
     )
-    store.record_run(req.vertical.value, decision["action"], decision["risk_score"], name)
+    run_id = store.record_run(
+        req.vertical.value, decision["action"], decision["risk_score"], name,
+        extra={
+            "locale": req.locale,
+            "ocr_used": ocr_used,
+            "extracted": res["extracted"],
+            "masked_source_preview": res["masked_source_preview"],
+            "enrichment": enrichment,
+            "decision": decision,
+            "ubo": ubo,
+            "trace": trace,
+        },
+    )
     return {
         "vertical": res["vertical"],
+        "run_id": run_id,
         "ocr_used": ocr_used,
         "extracted": res["extracted"],
         "masked_source_preview": res["masked_source_preview"],
         "enrichment": enrichment,
         "decision": decision,
+        "ubo": ubo,
+        "trace": trace,
+        "trace_summary": summary(trace),
     }
 
 
@@ -179,6 +217,93 @@ def sar_status(sar_id: str, body: dict):
 def mi_report():
     """监管 MI 报表：决策统计、告警与 SAR 汇总。"""
     return build_mi_report()
+
+
+# ============ 能力覆盖度 / 规则包 / 审计包 / 解析器 / MCP ============
+
+@app.get("/v1/capabilities")
+def capabilities(locale: str = "zh-HK"):
+    """对外可引用的覆盖度数字：业务线、数据源、闸口规则、模型预设、解析器。"""
+    return capabilities_snapshot(locale)
+
+
+@app.get("/v1/rules")
+def rules_export(version: Optional[str] = None, vertical: Optional[str] = None):
+    """导出合规闸口规则包（可 diff / 可交给合规审阅）；按 vertical 过滤。"""
+    pack = rules.export(version)
+    if vertical:
+        pack["rules"] = [r for r in pack["rules"] if r["vertical"] in ("*", vertical)]
+        pack["count"] = len(pack["rules"])
+    return pack
+
+
+@app.get("/v1/rules/version")
+def rules_version():
+    return {"version": rules.RULE_PACK_VERSION, "count": len(rules.RULES)}
+
+
+@app.get("/v1/runs/{run_id}/audit")
+def run_audit(run_id: str):
+    """审计包：一次作业的完整证据链（抽取字段 / 富集信号 / 规则命中 / 决策 / trace / UBO）。"""
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="run not found")
+    decision = run.get("decision") or {}
+    return {
+        "run_id": run.get("id", run_id),
+        "ts": run.get("ts"),
+        "vertical": run.get("vertical"),
+        "locale": run.get("locale", "zh-HK"),
+        "generated_at": store.now_iso(),
+        "schema_version": "ceron-audit-1.0",
+        "rule_pack": decision.get("rule_pack") or {"version": rules.RULE_PACK_VERSION},
+        "subject": run.get("name"),
+        "extracted": run.get("extracted", {}),
+        "masked_source_preview": run.get("masked_source_preview", ""),
+        "enrichment": run.get("enrichment", {}),
+        "decision": decision,
+        "evidence": decision.get("evidence", []),
+        "ubo": run.get("ubo"),
+        "review": decision.get("review"),
+        "trace": run.get("trace", []),
+        "trace_summary": summary(run.get("trace", [])),
+    }
+
+
+@app.get("/v1/parsers")
+def parsers_list(locale: str = "zh-HK"):
+    """已注册的文档解析器与可用性（PaddleOCR / Docling / Marker / 内置）。"""
+    return list_parsers(locale)
+
+
+@app.post("/v1/parse")
+def parse_endpoint(req: ParseReq):
+    """单文件解析（可插拔解析器，不可用自动降级内置）。"""
+    import base64
+
+    trace = new_trace()
+    data = base64.b64decode(req.file_base64 or "")
+    out = parse_document(data, req.filename, req.locale, req.parser, trace=trace)
+    out["trace"] = trace
+    return out
+
+
+@app.get("/v1/mcp/tools")
+def mcp_tools():
+    """MCP 工具清单：把抽取/富集/决策/UBO/规则包暴露给任意 Agent 调用。"""
+    return {"tools": mcp.tools_list(), "protocol": "mcp-jsonrpc-2.0"}
+
+
+@app.post("/v1/mcp")
+async def mcp_rpc(body: dict):
+    """最小 JSON-RPC 2.0 入口（methods: tools/list、tools/call）。"""
+    return await mcp.handle_rpc(body)
+
+
+@app.post("/v1/ubo")
+def ubo_endpoint(body: dict):
+    """UBO 图穿透：股权边相乘计算有效持股，识别循环持股与未穿透情形。"""
+    return resolve_ubo(body.get("extracted", {}), body.get("ownership_edges"), body.get("root"))
 
 
 # ============ 认证（Auth）：注册 / 登录 / 会话 / X / Facebook 第三方登录 ============

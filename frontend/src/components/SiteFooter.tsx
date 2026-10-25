@@ -13,6 +13,7 @@ export default function SiteFooter() {
       titleKey: "footerPlatform",
       items: [
         { key: "fProductCaps", href: "/products" },
+        { key: "fCompare", href: "/compare" },
         { key: "fArchitecture", href: "/products#architecture" },
         { key: "fConsole", href: "/app" },
       ],
@@ -28,7 +29,7 @@ export default function SiteFooter() {
     {
       titleKey: "footerCompany",
       items: [
-        { key: "fGithub", href: "https://github.com" },
+        { key: "fGithub", href: "https://github.com/wjc1wjc2wjc3/Ceron" },
         { key: "fContact", href: "mailto:hello@ceron.ai" },
       ],
     },

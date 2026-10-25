@@ -45,8 +45,14 @@ class LLMClient:
     def json_mode(self) -> bool:
         return self.cfg.json_mode if self.cfg else True
 
-    async def extract(self, text: str, schema_hint: str) -> dict:
+    async def extract(self, text: str, schema_hint: str, trace: Optional[list] = None) -> dict:
+        import time
+
+        from app.trace import stamp
+
         if self.provider == "mock" or not self.api_key:
+            stamp(trace, "extract", self.provider or "mock", started=time.perf_counter(), ok=True,
+                  model=self.model, fallback=True)
             return {"_mock": True}
 
         messages = [
@@ -57,6 +63,7 @@ class LLMClient:
         if self.json_mode:
             payload["response_format"] = {"type": "json_object"}
 
+        t0 = time.perf_counter()
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
@@ -64,13 +71,27 @@ class LLMClient:
                 json=payload,
             )
             # 部分国产模型不支持 response_format：400 时降级重试一次
+            degraded_json_mode = False
             if resp.status_code == 400 and self.json_mode:
                 payload.pop("response_format", None)
+                degraded_json_mode = True
                 resp = await client.post(
                     f"{self.base_url}/chat/completions",
                     headers={"Authorization": f"Bearer {self.api_key}"},
                     json=payload,
                 )
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"]
+            body = resp.json()
+            content = body["choices"][0]["message"]["content"]
+            usage = body.get("usage") or {}
+            stamp(
+                trace, "extract", self.provider or "openai-compatible", started=t0, ok=True,
+                model=self.model,
+                base_url=self.base_url,
+                provider=self.provider,
+                prompt_tokens=usage.get("prompt_tokens"),
+                completion_tokens=usage.get("completion_tokens"),
+                total_tokens=usage.get("total_tokens"),
+                json_mode_downgraded=degraded_json_mode,
+            )
             return json.loads(content)

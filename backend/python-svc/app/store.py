@@ -128,9 +128,12 @@ class PostgresBackend:
             self._pool.putconn(conn)
 
     # --- 决策历史 / 实体 ---
-    def record_run(self, vertical, action, risk_score, name, job_id):
+    def record_run(self, vertical, action, risk_score, name, job_id, extra=None):
         from psycopg2.extras import Json
 
+        payload = {"action": action, "risk_score": risk_score, "name": name}
+        if extra:
+            payload.update(extra)
         with self._conn() as conn:
             cur = conn.cursor()
             cur.execute(
@@ -142,7 +145,7 @@ class PostgresBackend:
                     status   = 'decided',
                     result   = EXCLUDED.result
                 """,
-                (job_id, vertical, Json({"action": action, "risk_score": risk_score, "name": name})),
+                (job_id, vertical, Json(payload)),
             )
             if name:
                 cur.execute(
@@ -150,6 +153,19 @@ class PostgresBackend:
                     "ON CONFLICT (name) DO NOTHING",
                     (name, vertical),
                 )
+
+    def get_run(self, run_id):
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, vertical, status, result, created_at FROM jobs WHERE id = %s",
+                        (run_id,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        out = dict(row[3] or {})
+        out.update({"id": row[0], "vertical": row[1] or out.get("vertical"),
+                    "status": row[2], "ts": _iso(row[4])})
+        return out
 
     def list_runs(self):
         with self._conn() as conn:
@@ -401,23 +417,45 @@ _pg = _create_backend()
 
 # ============ 公共 API（内存 / Postgres 统一入口）============
 def record_run(vertical: str, action: str, risk_score: int,
-               name: Optional[str] = None, job_id: Optional[str] = None) -> None:
-    """记录一次决策结果，并登记实体供持续监控。"""
+               name: Optional[str] = None, job_id: Optional[str] = None,
+               extra: Optional[dict] = None) -> str:
+    """记录一次决策结果，并登记实体供持续监控。
+
+    ``extra`` 用于把完整证据链（抽取字段 / 富集信号 / 决策理由 / 规则命中 / trace）
+    一并持久化，使审计包可导出；返回 run_id 供前端回溯。
+    """
+    run_id = job_id or f"PY-{uuid.uuid4().hex[:12]}"
     if _pg is not None:
-        _pg.record_run(vertical, action, risk_score, name,
-                       job_id or f"PY-{uuid.uuid4().hex[:12]}")
-        return
-    with _lock:
-        pipeline_runs.append({
-            "ts": now_iso(),
-            "vertical": vertical,
-            "action": action,
-            "risk_score": risk_score,
-            "name": name,
-        })
-        if name:
+        _pg.record_run(vertical, action, risk_score, name, run_id, extra)
+    else:
+        with _lock:
+            entry = {
+                "id": run_id,
+                "ts": now_iso(),
+                "vertical": vertical,
+                "action": action,
+                "risk_score": risk_score,
+                "name": name,
+            }
+            if extra:
+                entry.update(extra)
+            pipeline_runs.append(entry)
+    if name:
+        with _lock:
             if not any(e["name"] == name for e in entities):
                 entities.append({"name": name, "vertical": vertical, "ts": now_iso()})
+    return run_id
+
+
+def get_run(run_id: str) -> Optional[dict]:
+    """按 run_id 取回一次作业的完整证据（审计包导出用）。"""
+    if _pg is not None:
+        return _pg.get_run(run_id)
+    with _lock:
+        for e in pipeline_runs:
+            if e.get("id") == run_id:
+                return dict(e)
+    return None
 
 
 def list_runs() -> list[dict]:

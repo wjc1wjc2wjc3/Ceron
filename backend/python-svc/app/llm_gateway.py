@@ -34,14 +34,18 @@ def _backfill_money(cleaned: dict, schema_cls: Type[BaseModel], candidates):
                 cleaned[f] = cands.pop(0)
 
 
-async def extract(text: str, schema_cls: Type[BaseModel], cfg: Optional[LLMCfg] = None) -> BaseModel:
+async def extract(text: str, schema_cls: Type[BaseModel], cfg: Optional[LLMCfg] = None,
+                  trace: Optional[list] = None) -> BaseModel:
     """抽取结构化字段。传入 cfg 时使用该用户选定的模型，否则走服务级默认客户端。"""
+    from app.trace import stamp
+
     hint = json.dumps(schema_cls.model_json_schema(), ensure_ascii=False)
     client = _CLIENT if cfg is None else LLMClient(cfg)
-    raw = await client.extract(text, hint)
+    raw = await client.extract(text, hint, trace=trace)
 
     if raw.get("_mock") or not raw:
         raw = rule_extract(text)
+        stamp(trace, "extract", "rule_fallback", ok=True, model="regex", fallback=True)
 
     allowed = set(schema_cls.model_fields.keys())
     cleaned = {k: v for k, v in raw.items() if k in allowed}

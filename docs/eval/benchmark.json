@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-10-24T19:11:11.900673+00:00",
+  "mode": "rule-fallback",
+  "llm_provider": "mock",
+  "metric": "field-level exact match",
+  "total_fields": 63,
+  "total_correct": 63,
+  "accuracy": 1.0,
+  "cases": [
+    {
+      "case": "insurance_hk · 繁體中文",
+      "vertical": "insurance_hk",
+      "fields": 8,
+      "correct": 8,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "insurance_hk · English",
+      "vertical": "insurance_hk",
+      "fields": 6,
+      "correct": 6,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "insurance_hk · 简体中文",
+      "vertical": "insurance_hk",
+      "fields": 8,
+      "correct": 8,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "family_office · 繁體中文",
+      "vertical": "family_office",
+      "fields": 7,
+      "correct": 7,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "banking_mortgage · 繁體中文",
+      "vertical": "banking_mortgage",
+      "fields": 10,
+      "correct": 10,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "securities_suitability · 繁體中文",
+      "vertical": "securities_suitability",
+      "fields": 8,
+      "correct": 8,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "mpf · 繁體中文",
+      "vertical": "mpf",
+      "fields": 8,
+      "correct": 8,
+      "accuracy": 1.0,
+      "misses": []
+    },
+    {
+      "case": "fund_ofc_lpf · 繁體中文",
+      "vertical": "fund_ofc_lpf",
+      "fields": 8,
+      "correct": 8,
+      "accuracy": 1.0,
+      "misses": []
+    }
+  ]
+}

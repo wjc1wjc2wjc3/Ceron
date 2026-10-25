@@ -8,7 +8,8 @@
 
 所有面向用户的标记文案支持按 locale 本地化（zh-HK / en / zh-CN）。
 """
-from typing import Protocol
+import time
+from typing import Optional, Protocol
 
 import httpx
 
@@ -532,18 +533,28 @@ def get_configured_providers() -> list:
     return provs
 
 
-def enrich(vertical: str, extracted: dict, locale: str = "zh-HK") -> dict:
+def enrich(vertical: str, extracted: dict, locale: str = "zh-HK",
+           trace: Optional[list] = None) -> dict:
     """运行全部已配置的富集 Provider，与 mock 基线合并。
 
     当 .env 配置了对应 *_API_URL 时，对应 Provider 会被实际调用；
     任一外部源调用失败均自动降级并打「需人工複核」标记，流水线不中断。
     全部未配置时退化为 mock 基线（离线可跑）。
     """
+    from app.trace import stamp
+
     result = _base_result(extracted, locale)
     providers = get_configured_providers()
     if not providers:
         return result
     result["provider"] = "+".join(p.name for p in providers)
     for p in providers:
-        _merge(result, p.enrich(vertical, extracted, locale))
+        t0 = time.perf_counter()
+        try:
+            _merge(result, p.enrich(vertical, extracted, locale))
+            stamp(trace, "enrich", getattr(p, "name", type(p).__name__), started=t0, ok=True,
+                  configured=True)
+        except Exception as e:  # 单个数据源异常不中断整条流水线
+            stamp(trace, "enrich", getattr(p, "name", type(p).__name__), started=t0, ok=False, error=e,
+                  configured=True)
     return result

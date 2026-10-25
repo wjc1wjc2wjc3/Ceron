@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import DownloadIcon from "@mui/icons-material/Download";
 import { useT } from "../app/i18n";
 
 type DecisionAction = "approve" | "manual_review" | "reject";
@@ -87,6 +88,15 @@ const ACTION_COLOR: Record<DecisionAction, "success" | "warning" | "error"> = {
   manual_review: "warning",
   reject: "error",
 };
+// HITL 级别 → i18n key
+const REVIEW_LABEL: Record<string, string> = {
+  none: "reviewNone",
+  field: "reviewField",
+  source: "reviewSource",
+  gate: "reviewGate",
+  risk: "reviewRisk",
+};
+
 const STATUS_COLOR: Record<string, any> = {
   queued: "default",
   processing: "info",
@@ -204,6 +214,21 @@ export default function JobsView() {
           : x
       )
     );
+  }
+
+  // 审计包：一次性作业的证据链（抽取字段 / 富集信号 / 规则命中 / trace），可交给合规与监管
+  async function downloadAudit(runId?: string) {
+    if (!runId) return;
+    const res = await fetch(`/py/v1/runs/${runId}/audit`);
+    if (!res.ok) return;
+    const pack = await res.json();
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ceron-audit-${runId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const sel = jobs.find((j) => j.id === selected) || null;
@@ -386,8 +411,62 @@ export default function JobsView() {
               >
                 {t("manualReject")}
               </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                disabled={!sel.result?.run_id}
+                onClick={() => downloadAudit(sel.result?.run_id)}
+                title={sel.result?.run_id ? t("auditDownload") : t("auditNoRun")}
+              >
+                {t("auditDownload")}
+              </Button>
             </Stack>
           </Stack>
+
+          {/* 人工覆核分级（HITL 检查点）+ 命中的合规规则：让「为什么喊人」可见 */}
+          {sel.result?.decision?.review && (
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} alignItems="center" flexWrap="wrap" rowGap={1}>
+              <Chip
+                size="small"
+                color={
+                  sel.result.decision.review.level === "none"
+                    ? "default"
+                    : sel.result.decision.review.level === "risk"
+                    ? "error"
+                    : "warning"
+                }
+                label={`${t("reviewLevel")}：${t(
+                  REVIEW_LABEL[String(sel.result.decision.review.level)] || "reviewNone"
+                )}`}
+              />
+              {sel.result.decision.rule_pack?.version && (
+                <Chip size="small" variant="outlined" label={`rule pack ${sel.result.decision.rule_pack.version}`} />
+              )}
+              {!!sel.result.trace_summary?.steps && (
+                <Chip size="small" variant="outlined" label={`${t("traceSteps")} ${sel.result.trace_summary.steps}`} />
+              )}
+            </Stack>
+          )}
+          {!!(sel.result?.decision?.rules_hit || []).length && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                {t("rulesHitTitle")}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }} flexWrap="wrap" rowGap={1}>
+                {(sel.result.decision.rules_hit as any[]).map((h: any) => (
+                  <Chip
+                    key={h.id}
+                    size="small"
+                    variant="outlined"
+                    color={h.severity === "critical" ? "error" : h.severity === "high" ? "warning" : "default"}
+                    label={`${h.gate} · ${h.id} (+${h.delta})`}
+                    title={h.reason}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
           {sel.review_status && (
             <Typography variant="caption" color="text.secondary">
               {t("reviewConclusion")

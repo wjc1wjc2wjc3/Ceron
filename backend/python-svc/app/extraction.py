@@ -8,9 +8,10 @@ from app.schemas import Vertical, get_schema
 
 
 async def extract_document(text: str, vertical: Vertical,
-                           cfg: Optional[LLMCfg] = None) -> dict:
+                           cfg: Optional[LLMCfg] = None,
+                           trace: Optional[list] = None) -> dict:
     schema_cls = get_schema(vertical)
-    model = await extract(text, schema_cls, cfg)
+    model = await extract(text, schema_cls, cfg, trace=trace)
     payload = model.model_dump(exclude_none=True)
     return {
         "vertical": vertical.value,

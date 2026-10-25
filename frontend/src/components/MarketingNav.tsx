@@ -13,6 +13,7 @@ export default function MarketingNav() {
 
   const links = [
     { key: "navPlatform", href: "/products" },
+    { key: "navCompare", href: "/compare" },
     { key: "navArchitecture", href: "/products#architecture" },
   ];
 
