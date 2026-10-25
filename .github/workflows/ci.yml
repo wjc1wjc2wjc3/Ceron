@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Python 智能服务层（pytest + 基准门禁）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/python-svc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio anyio
+
+      - name: 单元测试（含 RBAC 越权用例）
+        run: pytest -q
+
+      - name: 抽取准确率回归门禁
+        # rule-fallback 兜底基线必须保持不回退；配置 LLM_API_KEY 后可改判真实模型准确率
+        run: python poc/benchmark.py --write --fail-under 0.99
+
+  frontend:
+    name: 前端（类型检查 + 构建）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npx tsc --noEmit
+
+      - name: 构建
+        run: npm run build

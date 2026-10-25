@@ -254,6 +254,24 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 docker compose up --build    # 前端 :3000 → Go :8080 → Python :8000
 ```
 
+### CI 与质量门禁
+
+`.github/workflows/ci.yml` 在 push/PR 时自动跑：后端 `pytest` + **抽取准确率回归门禁**
+（`poc/benchmark.py --write --fail-under 0.99`，准确率低于阈值即以非 0 退出码失败），
+前端 `tsc --noEmit` + `npm run build`。本地可先跑同样的两步自查：
+
+```bash
+cd backend/python-svc && pytest -q && py poc/benchmark.py --write --fail-under 0.99
+```
+
+### 角色权限（RBAC）
+
+三种角色：**analyst**（发起作业，注册即默认）/ **reviewer**（处置告警、起草与流转 SAR、规则治理）/ **admin**（全部）。
+
+- 注册接口**一律 analyst，不能自提权**；`reviewer`/`admin` 只能由 `ADMIN_EMAILS`（逗号分隔的管理员邮箱清单）授予，或由管理员直接改 `users.role`；
+- 受保护写操作：规则休眠/停用、告警处置、SAR 起草与流转（未登录 401、权限不足 403）；规则导出、MI、能力清单等只读能力保持开放；
+- 前端按角色自动显隐操作按钮，analyst 看到只读提示。
+
 ### 双语抽取 PoC
 ```bash
 cd backend/python-svc && py poc/bilingual_poc.py

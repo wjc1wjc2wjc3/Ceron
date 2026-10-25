@@ -91,6 +91,14 @@ class Settings:
     auth_code_resend: int = int(os.getenv("AUTH_CODE_RESEND_SECONDS", "60"))
     # 密码重置令牌有效期（秒）
     auth_reset_ttl: int = int(os.getenv("AUTH_RESET_TTL_SECONDS", "1800"))
+    # RBAC：analyst（发起作业）/ reviewer（处置告警、SAR、规则治理）/ admin（全部）。
+    # 注册一律 analyst；reviewer/admin 只能由 ADMIN_EMAILS（管理员邮箱清单，逗号分隔）授予，
+    # 也可由管理员直接改库里的 users.role——杜绝「注册即管理员」这类越权入口。
+    admin_emails_raw: str = os.getenv("ADMIN_EMAILS", "")
+
+    @property
+    def admin_emails_list(self) -> set:
+        return {e.strip().lower() for e in self.admin_emails_raw.split(",") if e.strip()}
     # ===== 邮件（验证码登录 / 重置密码）=====
     # 未配置 SMTP_HOST 时不真实发信：内容打印到服务日志并可回显调试值
     smtp_host: str = os.getenv("SMTP_HOST", "")

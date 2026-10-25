@@ -6,7 +6,13 @@ import {
   TableHead, TableRow, TextField, Typography,
 } from "@mui/material";
 import NavBar from "../../../components/NavBar";
+import { canOpsWrite, useAuth } from "../../../components/AuthProvider";
 import { I18nProvider, useT } from "../../i18n";
+
+function token(): string {
+  if (typeof document === "undefined") return "";
+  return localStorage.getItem("ceron_token") || "";
+}
 
 interface RuleState {
   enabled: boolean;
@@ -34,7 +40,11 @@ const SEVERITY_COLOR: Record<string, "default" | "info" | "warning" | "error"> =
 async function api(path: string, init?: RequestInit) {
   const res = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token()}`,
+      ...(init?.headers || {}),
+    },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.detail || data?.error || `request_failed_${res.status}`);
@@ -50,6 +60,8 @@ function toIso(value: string): string | null {
 
 function RulesView() {
   const { t } = useT();
+  const { user } = useAuth();
+  const canWrite = canOpsWrite(user);   // RBAC：改规则口径需 reviewer/admin
   const [pack, setPack] = useState<{ version: string; count: number; rules: Rule[] } | null>(null);
   const [locale] = useState<string>(
     typeof document !== "undefined" && document.cookie.includes("lang=zh-CN") ? "zh-CN" : "zh-HK"
@@ -104,6 +116,11 @@ function RulesView() {
           <Stack direction="row" spacing={1}>
             <Chip size="small" label={`${t("rulesVersion")}: ${pack?.version ?? "…"}`} />
             <Chip size="small" color="primary" label={`${activeCount}/${pack?.count ?? 0} ${t("rulesActive")}`} />
+            <Chip
+              size="small" variant="outlined"
+              label={`${t("roleLabel")}: ${user?.role || "analyst"}`}
+            />
+            {!canWrite && <Chip size="small" color="warning" label={t("readonlyRole")} />}
           </Stack>
         </Stack>
 
@@ -145,7 +162,7 @@ function RulesView() {
                           <Switch
                             size="small"
                             checked={!disabled}
-                            disabled={busyId === r.id}
+                            disabled={busyId === r.id || !canWrite}
                             onChange={(e) => setState(r.id, { enabled: e.target.checked })}
                           />
                           {disabled && (
@@ -158,7 +175,8 @@ function RulesView() {
                           <TextField
                             size="small" type="datetime-local"
                             value={(r.state?.snoozed_until || "").slice(0, 16)}
-                            disabled={busyId === r.id}
+                            disabled={busyId === r.id || !canWrite}
+                            title={canWrite ? "" : t("readonlyRole")}
                             onChange={(e) => {
                               const iso = toIso(e.target.value);
                               if (iso) setState(r.id, { snoozed_until: iso });

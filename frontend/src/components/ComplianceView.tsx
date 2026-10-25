@@ -7,7 +7,27 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import GavelIcon from "@mui/icons-material/Gavel";
+import { canOpsWrite, useAuth } from "./AuthProvider";
 import { useT } from "../app/i18n";
+
+function token(): string {
+  if (typeof document === "undefined") return "";
+  return localStorage.getItem("ceron_token") || "";
+}
+
+async function api(path: string, init?: RequestInit) {
+  const res = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token()}`,
+      ...(init?.headers || {}),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.detail || data?.error || `request_failed_${res.status}`);
+  return data;
+}
 
 interface AlertRec {
   id: string | number;
@@ -41,18 +61,10 @@ const STATUS_COLOR: Record<string, "default" | "primary" | "success" | "warning"
   resolved: "default",
 };
 
-async function api(path: string, init?: RequestInit) {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.detail || data?.error || `request_failed_${res.status}`);
-  return data;
-}
-
 export default function ComplianceView() {
   const { t } = useT();
+  const { user } = useAuth();
+  const canWrite = canOpsWrite(user);   // RBAC：写操作按角色显隐
   const [tab, setTab] = useState(0);
   const [alerts, setAlerts] = useState<AlertRec[]>([]);
   const [sars, setSars] = useState<SarRec[]>([]);
@@ -146,7 +158,11 @@ export default function ComplianceView() {
     <Stack spacing={2} sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: "auto" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
         <Box>
-          <Typography variant="h4" fontWeight={800}>{t("monTitle")}</Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h4" fontWeight={800}>{t("monTitle")}</Typography>
+            <Chip size="small" variant="outlined"
+              label={`${t("roleLabel")}: ${user?.role || "analyst"}`} />
+          </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {t("monSubtitle")}
           </Typography>
@@ -211,23 +227,29 @@ export default function ComplianceView() {
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        {a.status === "open" && (
+                        {a.status === "open" && canWrite && (
                           <Button size="small" onClick={() => setAlertStatus(a.id, "acknowledged")}>
                             {t("alertAck")}
                           </Button>
                         )}
-                        {a.status !== "resolved" && (
+                        {a.status !== "resolved" && canWrite && (
                           <Button size="small" onClick={() => setAlertStatus(a.id, "resolved")}>
                             {t("alertResolve")}
                           </Button>
                         )}
-                        <Button
-                          size="small" variant="contained"
-                          startIcon={<GavelIcon />}
-                          onClick={() => alertToSar(a)}
-                        >
-                          {t("alertToSar")}
-                        </Button>
+                        {canWrite ? (
+                          <Button
+                            size="small" variant="contained"
+                            startIcon={<GavelIcon />}
+                            onClick={() => alertToSar(a)}
+                          >
+                            {t("alertToSar")}
+                          </Button>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            {t("readonlyRole")}
+                          </Typography>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -299,21 +321,26 @@ export default function ComplianceView() {
                         </TableCell>
                         <TableCell align="right">
                           <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            {s.status === "draft" && (
+                            {s.status === "draft" && canWrite && (
                               <Button size="small" variant="contained"
                                 onClick={() => setSarStatus(s.id, "submitted")}>
                                 {t("sarSubmit")}
                               </Button>
                             )}
-                            {s.status === "submitted" && (
+                            {s.status === "submitted" && canWrite && (
                               <Button size="small" onClick={() => setSarStatus(s.id, "closed")}>
                                 {t("sarClose")}
                               </Button>
                             )}
-                            {s.status === "closed" && (
+                            {s.status === "closed" && canWrite && (
                               <Button size="small" onClick={() => setSarStatus(s.id, "draft")}>
                                 {t("sarReopen")}
                               </Button>
+                            )}
+                            {!canWrite && (
+                              <Typography variant="caption" color="text.secondary">
+                                {t("readonlyRole")}
+                              </Typography>
                             )}
                           </Stack>
                         </TableCell>

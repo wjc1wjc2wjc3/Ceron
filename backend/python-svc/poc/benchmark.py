@@ -135,6 +135,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true", help="输出 JSON")
     ap.add_argument("--write", action="store_true", help="写入 docs/eval/benchmark.json")
+    ap.add_argument(
+        "--fail-under", type=float, default=None, metavar="RATIO",
+        help="回归门禁：总体字段级准确率低于该阈值（0~1，如 0.95）时以非 0 退出码失败，供 CI 拦截质量回退",
+    )
     args = ap.parse_args()
 
     report = asyncio.run(run())
@@ -158,6 +162,16 @@ def main() -> None:
     print("-" * 78)
     print(f"  总体字段级准确率: {report['accuracy']:.0%} ({report['total_correct']}/{report['total_fields']})")
     print("  说明：rule-fallback 为未配置密钥时的兜底基线；配置 LLM_API_KEY 后重跑即得真实模型准确率。")
+
+    if args.fail_under is not None:
+        acc = report["accuracy"]
+        gate_ok = acc >= args.fail_under
+        print("-" * 78)
+        print(f"  回归门禁 (--fail-under {args.fail_under:.0%}): {'PASS' if gate_ok else 'FAIL'} "
+              f"(实测 {acc:.0%})")
+        if not gate_ok:
+            print("  质量回退：抽取准确率低于门禁阈值。请检查正则兜底规则或 schema 配置的改动。")
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

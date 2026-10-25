@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT NOT NULL DEFAULT '',
   provider      TEXT NOT NULL DEFAULT 'email',
   provider_id   TEXT,
+  role          TEXT NOT NULL DEFAULT 'analyst',   -- analyst | reviewer | admin（RBAC）
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_provider_uidx
@@ -103,6 +104,13 @@ CREATE TABLE IF NOT EXISTS llm_settings (
 """
 
 
+# 增量迁移（幂等）：CREATE TABLE IF NOT EXISTS 不会为既有库补新列，
+# 所以后加的列必须走 ALTER TABLE ADD COLUMN IF NOT EXISTS。
+_PG_MIGRATIONS = (
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'analyst'",
+)
+
+
 class PostgresBackend:
     """基于 psycopg2 连接池的持久化后端（仅在与 go-svc 一致的 schema 上工作）。"""
 
@@ -114,6 +122,8 @@ class PostgresBackend:
         with self._conn() as conn:
             cur = conn.cursor()
             cur.execute(_PG_DDL)
+            for stmt in _PG_MIGRATIONS:
+                cur.execute(stmt)
 
     @contextmanager
     def _conn(self):
@@ -271,43 +281,46 @@ class PostgresBackend:
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO users (id, email, password_hash, name, provider, provider_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO users (id, email, password_hash, name, provider, provider_id, role)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
                 """,
                 (user["id"], user["email"], user.get("password_hash"), user.get("name", ""),
-                 user.get("provider", "email"), user.get("provider_id")),
+                 user.get("provider", "email"), user.get("provider_id"),
+                 user.get("role") or "analyst"),
             )
         return user
 
     def get_user_by_email(self, email: str):
         with self._conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
-                        "FROM users WHERE email = %s", (email,))
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, role, "
+                        "created_at FROM users WHERE email = %s", (email,))
             r = cur.fetchone()
         return self._row_to_user(r) if r else None
 
     def get_user_by_provider(self, provider: str, provider_id: str):
         with self._conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
-                        "FROM users WHERE provider = %s AND provider_id = %s", (provider, provider_id))
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, role, "
+                        "created_at FROM users WHERE provider = %s AND provider_id = %s",
+                        (provider, provider_id))
             r = cur.fetchone()
         return self._row_to_user(r) if r else None
 
     def get_user_by_id(self, user_id: str):
         with self._conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, created_at "
-                        "FROM users WHERE id = %s", (user_id,))
+            cur.execute("SELECT id, email, password_hash, name, provider, provider_id, role, "
+                        "created_at FROM users WHERE id = %s", (user_id,))
             r = cur.fetchone()
         return self._row_to_user(r) if r else None
 
     @staticmethod
     def _row_to_user(r) -> dict:
         return {"id": r[0], "email": r[1], "password_hash": r[2], "name": r[3],
-                "provider": r[4], "provider_id": r[5], "created_at": _iso(r[6])}
+                "provider": r[4], "provider_id": r[5], "role": r[6] or "analyst",
+                "created_at": _iso(r[7])}
 
 
     # --- 邮箱验证码 / 密码重置 ---

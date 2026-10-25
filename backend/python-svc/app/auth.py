@@ -74,6 +74,7 @@ def create_token(user: dict) -> str:
         "sub": user["id"],
         "email": user.get("email", ""),
         "name": user.get("name", ""),
+        "role": effective_role(user),   # 决策不改角色：RLS 之外的粗粒度权限判据
         "iat": now,
         "exp": now + settings.auth_token_ttl,
     }
@@ -101,10 +102,23 @@ def verify_token(token: str) -> Optional[dict]:
     return payload
 
 
+def effective_role(user: dict) -> str:
+    """用户生效角色：ADMIN_EMAILS 名单优先（运维侧授予），否则用账号自身 role。
+
+    注册接口**只允许** analyst 角色，无法自提权；管理员身份只能由
+    ``ADMIN_EMAILS`` 环境变量授予，避免「注册即管理员」这类越权入口。
+    """
+    email = (user.get("email") or "").strip().lower()
+    if email and email in settings.admin_emails_list:
+        return "admin"
+    return user.get("role") or "analyst"
+
+
 def public_user(user: dict) -> dict:
     """脱敏后的用户信息（绝不外传 password_hash）。"""
     return {"id": user.get("id"), "email": user.get("email"),
-            "name": user.get("name"), "provider": user.get("provider", "email")}
+            "name": user.get("name"), "provider": user.get("provider", "email"),
+            "role": effective_role(user)}
 
 
 def issue(user: dict) -> dict:
@@ -127,6 +141,7 @@ def register(email: str, password: str, name: str = "") -> dict:
         "name": name or email.split("@")[0],
         "provider": "email",
         "provider_id": None,
+        "role": "analyst",          # 注册一律 analyst：不允许自行提权
         "created_at": store.now_iso(),
     }
     store.create_user(user)

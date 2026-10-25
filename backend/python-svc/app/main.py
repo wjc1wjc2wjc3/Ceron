@@ -12,7 +12,7 @@ import json
 import uuid
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -36,6 +36,28 @@ from app.ubo import resolve as resolve_ubo
 
 app = FastAPI(title="Ceron Intelligence Service", version="0.3.0",
               description="香港金融业承保与合规自动化的 Python 大模型智能服务层")
+
+
+def require_roles(*allowed: str):
+    """RBAC 依赖：要求登录且角色在允许集合内（空集合 = 只需登录）。
+
+    涉及「改口径 / 对外申报」的写操作必须收敛到 reviewer / admin：
+    规则休眠停用、告警处置、SAR 起草与流转——一旦被随意操作就是合规风险。
+
+    定义在模块顶部：`Depends(require_roles(...))` 作为默认参数在**路由注册时**
+    求值，晚于此处定义会导致 NameError。
+    """
+
+    def dep(authorization: Optional[str] = Header(None)) -> dict:
+        payload = auth.verify_token(_token_from_header(authorization))
+        if not payload:
+            raise HTTPException(status_code=401, detail="auth_required")
+        role = payload.get("role") or "analyst"
+        if allowed and role not in allowed:
+            raise HTTPException(status_code=403, detail=f"role_forbidden:{role}")
+        return {"payload": payload, "role": role}
+
+    return dep
 
 
 class ExtractReq(BaseModel):
@@ -205,7 +227,8 @@ def monitoring_alerts():
 
 
 @app.patch("/v1/monitoring/alerts/{alert_id}")
-def monitoring_alert_status(alert_id: str, body: dict):
+def monitoring_alert_status(alert_id: str, body: dict,
+                            who: dict = Depends(require_roles("reviewer", "admin"))):
     """告警处置：open → acknowledged（已认领）→ resolved（已结案）。"""
     status = body.get("status")
     if status not in ("open", "acknowledged", "resolved"):
@@ -217,7 +240,8 @@ def monitoring_alert_status(alert_id: str, body: dict):
 
 
 @app.post("/v1/monitoring/alerts/{alert_id}/sar")
-def monitoring_alert_to_sar(alert_id: str):
+def monitoring_alert_to_sar(alert_id: str,
+                            who: dict = Depends(require_roles("reviewer", "admin"))):
     """从告警一键起草 SAR：把「发现 → 申报」两步串成一跳，避免人工漏报。"""
     alert = None
     for a in store.list_alerts():
@@ -236,7 +260,7 @@ def monitoring_alert_to_sar(alert_id: str):
 
 
 @app.post("/v1/sar")
-def sar_create(req: SarReq):
+def sar_create(req: SarReq, who: dict = Depends(require_roles("reviewer", "admin"))):
     """创建一份 SAR 草稿（高风险决策应触发 SAR 申报评估）。"""
     sar = create_sar(req.name, req.vertical, req.reason, req.decision_summary)
     return {"sar": sar}
@@ -248,7 +272,8 @@ def sar_list():
 
 
 @app.post("/v1/sar/{sar_id}/status")
-def sar_status(sar_id: str, body: dict):
+def sar_status(sar_id: str, body: dict,
+               who: dict = Depends(require_roles("reviewer", "admin"))):
     updated = set_status(sar_id, body.get("status", "submitted"))
     if not updated:
         raise HTTPException(status_code=404, detail="sar not found")
@@ -285,7 +310,8 @@ def rules_version():
 
 
 @app.post("/v1/rules/{rule_id}/state")
-def rules_state(rule_id: str, body: dict):
+def rules_state(rule_id: str, body: dict,
+                who: dict = Depends(require_roles("reviewer", "admin"))):
     """规则运行期治理（借鉴 marble 的 rule snooze）：
 
     - ``enabled: false`` 停用（误报止血，免发版）；

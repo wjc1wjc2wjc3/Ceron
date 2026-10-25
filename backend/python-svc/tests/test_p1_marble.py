@@ -106,14 +106,37 @@ def test_rule_snooze_until_and_expiry():
         rules.set_rule_state("HKMA.mortgage.ltv_above_cap", enabled=True, snoozed_until="")
 
 
+def _reviewer_headers():
+    """规则治理需 reviewer/admin：测试里注册一个 ADMIN_EMAILS 名单内的账号取令牌。"""
+    import uuid
+
+    from app.config import settings
+    email = f"rules-admin-{uuid.uuid4().hex[:10]}@example.hk"
+    pwd = "pass12345"
+    client.post("/v1/auth/register", json={"email": email, "password": pwd})
+    old = settings.admin_emails_raw
+    settings.admin_emails_raw = email
+    try:
+        tok = client.post("/v1/auth/login", json={"email": email, "password": pwd}).json()["token"]
+        return {"Authorization": f"Bearer {tok}"}
+    finally:
+        settings.admin_emails_raw = old
+
+
 def test_rule_state_endpoint():
+    h = _reviewer_headers()
     r = client.post("/v1/rules/HKMA.mortgage.ltv_above_cap/state",
-                    json={"snoozed_until": "2099-01-01T00:00:00Z"})
+                    json={"snoozed_until": "2099-01-01T00:00:00Z"}, headers=h)
     assert r.status_code == 200 and r.json()["state"]["snoozed_until"]
     try:
-        assert client.post("/v1/rules/no-such-rule/state", json={"enabled": False}).status_code == 404
+        bad = client.post("/v1/rules/no-such-rule/state", json={"enabled": False}, headers=h)
+        assert bad.status_code == 404
+        # 无令牌应被拒：Actor 治理不能靠自觉
+        assert client.post("/v1/rules/HKMA.mortgage.ltv_above_cap/state",
+                           json={"enabled": False}).status_code == 401
     finally:
-        client.post("/v1/rules/HKMA.mortgage.ltv_above_cap/state", json={"enabled": True, "snoozed_until": ""})
+        client.post("/v1/rules/HKMA.mortgage.ltv_above_cap/state",
+                    json={"enabled": True, "snoozed_until": ""}, headers=h)
 
 
 # ---------- ③ 抽取 schema 配置化（marble 的自定义数据模型）----------

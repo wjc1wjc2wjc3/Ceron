@@ -7,6 +7,15 @@ export interface AuthUser {
   email: string;
   name: string;
   provider: string;
+  /** RBAC 角色：analyst（发起作业）/ reviewer（处置告警·SAR·规则治理）/ admin（全部） */
+  role?: string;
+}
+
+/** 具备「改口径 / 对外申报」类写操作权限的角色。 */
+export const OPS_WRITE_ROLES = ["reviewer", "admin"];
+
+export function canOpsWrite(user: AuthUser | null): boolean {
+  return Boolean(user?.role && OPS_WRITE_ROLES.includes(user.role));
 }
 
 export interface Providers {
