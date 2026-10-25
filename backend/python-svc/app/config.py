@@ -48,6 +48,18 @@ class Settings:
     hmt_api_key: str = os.getenv("HMT_API_KEY", "")
     crs_api_url: str = os.getenv("CRS_API_URL", "")
     crs_api_key: str = os.getenv("CRS_API_KEY", "")
+    # 借鉴 kyc-analyst 的免费公开数据源：
+    # ICIJ Offshore Leaks（巴拿马/天堂/潘多拉文件）——公开站点可直接查（无需密钥），
+    # 配置 ICIJ_API_URL=https://offshoreleaks.icij.org/search 即启用（默认关闭，避免意外外呼）
+    icij_api_url: str = os.getenv("ICIJ_API_URL", "")
+    icij_api_key: str = os.getenv("ICIJ_API_KEY", "")
+    # OpenSanctions PEP（100+ 国家政治公众人物）；自托管 yente 或官方 API 均可
+    opensanctions_api_url: str = os.getenv("OPENSANCTIONS_API_URL", "")
+    opensanctions_api_key: str = os.getenv("OPENSANCTIONS_API_KEY", "")
+    # ===== 抽取 schema 配置化（借鉴 marble 的自定义数据模型）=====
+    # 指向 JSON 配置文件：覆盖/扩展既有业务线字段，或定义全新业务线；
+    # 未配置时使用内置 pydantic schema，行为不变。
+    schema_config: str = os.getenv("SCHEMA_CONFIG", "")
     # ===== 优先级 3：持续监控（Ongoing Monitoring）=====
     # 是否启用后台周期性重查调度（默认关闭；生产建议开启以符合持续尽职要求）
     monitoring_enabled: bool = str(os.getenv("MONITORING_ENABLED", "false")).lower() == "true"

@@ -88,7 +88,8 @@ async def call_tool(name: str, arguments: dict | None = None) -> dict:
     locale = args.get("locale", "zh-HK")
 
     if name == "ceron.extract":
-        out = await extract_document(args.get("text", ""), Vertical(args["vertical"]))
+        # vertical 接受内置枚举值或 schema 配置（SCHEMA_CONFIG）定义的自定义业务线
+        out = await extract_document(args.get("text", ""), args["vertical"])
         return out
 
     if name == "ceron.enrich":
@@ -98,7 +99,7 @@ async def call_tool(name: str, arguments: dict | None = None) -> dict:
         from app.decision import assess_with_review
 
         return assess_with_review(
-            Vertical(args["vertical"]), args.get("extracted", {}), args.get("enrichment") or {}, locale
+            args["vertical"], args.get("extracted", {}), args.get("enrichment") or {}, locale
         )
 
     if name == "ceron.ubo":

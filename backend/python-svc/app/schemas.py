@@ -120,6 +120,23 @@ _SCHEMAS = {
 }
 
 
-def get_schema(vertical: Vertical):
-    # 已知业务线用专属 schema；其余（含新增业务线）走通用兜底，保证流水线不中断。
-    return _SCHEMAS.get(vertical, GenericProfile)
+def get_schema(vertical):
+    """业务线 → 抽取 schema。
+
+    优先级：JSON 配置（schema_config，可覆盖/扩展字段或定义全新业务线）
+    → 内置专属 schema → 通用兜底（保证流水线不中断）。
+    """
+    from app import schema_config
+    from pydantic import BaseModel
+
+    key = vertical.value if isinstance(vertical, Vertical) else str(vertical)
+    builtin = _SCHEMAS.get(vertical) if isinstance(vertical, Vertical) else None
+    dynamic = schema_config.build_model(key, builtin or GenericProfile)
+    if isinstance(dynamic, type) and issubclass(dynamic, BaseModel):
+        return dynamic
+    return builtin or GenericProfile
+
+
+def vertical_key(vertical) -> str:
+    """Vertical 枚举或任意字符串 → 统一业务线键（配置化业务线为任意字符串）。"""
+    return vertical.value if isinstance(vertical, Vertical) else str(vertical)

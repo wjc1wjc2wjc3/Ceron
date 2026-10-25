@@ -4,7 +4,7 @@
 Neutrinos「预建保险方案」）。这里把业务线、数据源、闸口规则、模型预设、解析器
 统一统计后暴露为接口，供 README / 落地页 / 竞品对比页直接引用，避免各处手写数字不一致。
 """
-from app import rules
+from app import rules, schema_config
 from app.enrichment import get_configured_providers
 from app.llm_catalog import PRESETS
 from app.parsers import list_parsers
@@ -19,6 +19,8 @@ PROVIDER_CATALOG = [
     {"id": "ofac", "name": "OFAC SDN"},
     {"id": "hmt", "name": "HMT 綜合名單"},
     {"id": "crs", "name": "CRS / FATCA 稅務居民"},
+    {"id": "icij", "name": "ICIJ Offshore Leaks 離岸資料庫（免費公開）"},
+    {"id": "opensanctions_pep", "name": "OpenSanctions PEP（100+ 國家，免費公開）"},
 ]
 
 
@@ -28,10 +30,17 @@ def snapshot(locale: str = "zh-HK") -> dict:
     for r in rules.RULES:
         by_gate[r.gate] = by_gate.get(r.gate, 0) + 1
 
+    # 业务线 = 内置枚举 + schema 配置（SCHEMA_CONFIG）定义的自定义业务线
+    builtin = [v.value for v in Vertical]
+    all_verticals = schema_config.known_verticals(builtin)
+    custom = [v for v in all_verticals if v not in set(builtin)]
+
     return {
         "verticals": {
-            "count": len(list(Vertical)),
-            "items": [v.value for v in Vertical],
+            "count": len(all_verticals),
+            "items": all_verticals,
+            "custom": custom,
+            "schema_config": schema_config.config_path() if schema_config.is_configured() else None,
         },
         "data_sources": {
             "implemented": len(PROVIDER_CATALOG),

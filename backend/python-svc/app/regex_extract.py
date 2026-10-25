@@ -140,7 +140,14 @@ def _money_candidates(text: str):
 
 def rule_extract(text: str) -> dict:
     out: dict = {}
-    for label, key in _LABELS:
+    # 配置化 schema 的字段名/别名（schema_config）追加在最后：内置标签优先命中，
+    # 配置只补充新增字段与别名（自定义数据模型在无 LLM 时也能被正则兜底抽到）。
+    try:
+        from app.schema_config import extra_labels
+        labels = _LABELS + extra_labels()
+    except Exception:
+        labels = _LABELS
+    for label, key in labels:
         if key in out:          # 先命中者优先：避免宽泛别名（如 LTV）覆盖精确标签
             continue
         val = _field(text, label)

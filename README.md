@@ -274,7 +274,7 @@ cd backend/python-svc && py poc/benchmark.py --write
 | 维度 | 覆盖 |
 |---|---|
 | 业务线（Vertical） | **6**（insurance_hk / trust / family_office / banking_mortgage / securities_suitability / mpf / fund_ofc_lpf 中的全部枚举） |
-| 数据源 Provider | **7** 类已实现（ICRIS / 土地註冊處 / 信貸局 / 制裁服務 / OFAC / HMT / CRS），配置 `*_API_URL` 即启用、失败自动降级 |
+| 数据源 Provider | **9** 类已实现（ICRIS / 土地註冊處 / 信貸局 / 制裁服務 / OFAC / HMT / CRS / ICIJ Offshore Leaks / OpenSanctions PEP），配置 `*_API_URL` 即启用、失败自动降级；后两类为免费公开库（对标 kyc-analyst 数据源清单） |
 | 合规闸口规则 | **21** 条（SFC / HKMA / MPFA / AML-CFT），版本号 `RULE_PACK_VERSION=2026.10.1`，`GET /v1/rules` 可导出 diff 交给合规审阅 |
 | 模型预设 | **5** 家 + 自定义 OpenAI-compatible（DeepSeek / Kimi / GLM / Qwen / Doubao） |
 | 人工复核检查点 | **10** 个（CP-01…CP-10），四级分级：field（补件）→ source（人工取证）→ gate（合规判断）→ risk（签批） |
@@ -288,6 +288,8 @@ cd backend/python-svc && py poc/benchmark.py --write
 - **UBO 图穿透（P1-6）**：股权边相乘计算有效持股、识别循环持股；`POST /v1/ubo` / pipeline 内置。
 - **MCP 工具层（P1-5）**：`/v1/mcp/tools` + `/v1/mcp`（JSON-RPC 2.0），把 extract / enrich / decide / ubo / rules 暴露给任意 Agent（Dify / n8n / Claude）。
 - **可插拔解析器（P1-1）**：PaddleOCR / Docling（MIT）/ Marker / 内置兜底，`GET /v1/parsers` 查看可用性，未安装自动降级、绝不中断流水线。
+- **规则休眠/停用（借鉴 marble rule snooze）**：`POST /v1/rules/{rule_id}/state` 免发版即可停用（误报止血）或休眠到指定时刻（数据源维护窗口），执行记录里保留 `skipped`（审计可回答「为什么这条规则没跑」）。
+- **抽取 schema 配置化（借鉴 marble 自定义数据模型）**：`data/schema_config.json`（或 `SCHEMA_CONFIG` 指定路径）可覆盖/扩展既有业务线字段（别名同步喂给正则兜底抽取）、或定义全新业务线（如 `crypto_exchange`）——改 JSON 即生效，无需发版；示例见 `data/schema_config.example.json`。
 
 ---
 

@@ -323,6 +323,50 @@ def band_of(score: int) -> tuple[str, str]:
     return "low", "approve"
 
 
+# ============ 運行期治理狀態（借鑒 marble 的 rule snooze）============
+# 免發版即可停用某條規則、或讓它休眠到指定時間（誤報止血、名單服務維護窗口）。
+# 進程內狀態即可（規則內容本身仍在代碼裡版本化）；重啟後恢復規則包原始狀態。
+_RULE_STATE: dict[str, dict] = {}
+
+
+def _now() -> "datetime":
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def set_rule_state(rule_id: str, enabled: Optional[bool] = None,
+                   snoozed_until: Optional[str] = None) -> Optional[dict]:
+    """設置規則運行期狀態；``snoozed_until`` 傳 None/空串清除休眠。返回最新狀態。"""
+    if not any(r.id == rule_id for r in RULES):
+        return None
+    state = _RULE_STATE.setdefault(rule_id, {"enabled": True, "snoozed_until": None})
+    if enabled is not None:
+        state["enabled"] = bool(enabled)
+    if snoozed_until is not None:
+        state["snoozed_until"] = snoozed_until or None
+    return state
+
+
+def get_rule_state(rule_id: str) -> dict:
+    return dict(_RULE_STATE.get(rule_id, {"enabled": True, "snoozed_until": None}))
+
+
+def is_active(rule: Rule) -> bool:
+    """規則當前是否生效：被停用、或休眠期未到 → False。"""
+    state = _RULE_STATE.get(rule.id) or {}
+    if state.get("enabled") is False:
+        return False
+    until = state.get("snoozed_until")
+    if until:
+        try:
+            from datetime import datetime, timezone
+            if datetime.fromisoformat(str(until).replace("Z", "+00:00")) > _now():
+                return False
+        except ValueError:
+            pass  # 非法時間戳按未休眠處理，避免運維失誤把規則永久關掉
+    return True
+
+
 def evaluate(
     vertical: str,
     extracted: dict,
@@ -338,9 +382,14 @@ def evaluate(
 
     hits: list[dict] = []
     reasons: list[str] = []
+    skipped: list[dict] = []
     score = 0
     for rule in RULES:
         if rule.vertical not in ("*", vertical):
+            continue
+        if not is_active(rule):
+            # 停用/休眠中的規則不參與評分，但記入執行記錄（審計要求「為什麼沒跑」可回答）
+            skipped.append({"id": rule.id, **get_rule_state(rule.id)})
             continue
         try:
             matched = bool(rule.test(extracted, ctx))
@@ -360,7 +409,7 @@ def evaluate(
             "reason": text,
             "fields": [f for f in rule.fields if f in extracted],
         })
-    return {"score": score, "hits": hits, "reasons": reasons}
+    return {"score": score, "hits": hits, "reasons": reasons, "skipped": skipped}
 
 
 def export(version: str | None = None) -> dict:
@@ -380,6 +429,7 @@ def export(version: str | None = None) -> dict:
                 "delta": r.delta,
                 "fields": list(r.fields),
                 "reason": r.reason,
+                "state": get_rule_state(r.id),  # 運行期治理狀態（enabled / snoozed_until）
             }
             for r in RULES
         ],

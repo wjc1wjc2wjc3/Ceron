@@ -38,7 +38,8 @@ app = FastAPI(title="Ceron Intelligence Service", version="0.3.0",
 
 
 class ExtractReq(BaseModel):
-    vertical: Vertical
+    # vertical 接受内置业务线或 schema 配置（SCHEMA_CONFIG）定义的任意自定义业务线
+    vertical: str
     text: str
 
 
@@ -47,19 +48,19 @@ class OcrReq(BaseModel):
 
 
 class EnrichReq(BaseModel):
-    vertical: Vertical
+    vertical: str
     extracted: dict
 
 
 class DecisionReq(BaseModel):
-    vertical: Vertical
+    vertical: str
     extracted: dict
     enrichment: dict = {}
     locale: str = "zh-HK"
 
 
 class PipelineReq(BaseModel):
-    vertical: Vertical
+    vertical: str
     text: str = ""
     image_base64: str = ""
     locale: str = "zh-HK"
@@ -106,12 +107,12 @@ async def extract_endpoint(req: ExtractReq):
 
 @app.post("/v1/enrich")
 def enrich_endpoint(req: EnrichReq):
-    return {"vertical": req.vertical.value, "enrichment": enrich(req.vertical.value, req.extracted)}
+    return {"vertical": req.vertical, "enrichment": enrich(req.vertical, req.extracted)}
 
 
 @app.post("/v1/decision")
 def decision_endpoint(req: DecisionReq):
-    return {"vertical": req.vertical.value,
+    return {"vertical": req.vertical,
             "decision": assess(req.vertical, req.extracted, req.enrichment, req.locale)}
 
 
@@ -135,7 +136,7 @@ async def pipeline_endpoint(req: PipelineReq, authorization: Optional[str] = Hea
     # 作业级 trace：记录每一步用的模型、数据源、耗时与成功与否（模型治理要求）
     trace = new_trace()
     res = await extract_document(text, req.vertical, cfg, trace=trace)
-    enrichment = enrich(req.vertical.value, res["extracted"], req.locale, trace=trace)
+    enrichment = enrich(req.vertical, res["extracted"], req.locale, trace=trace)
     decision = assess_with_review(req.vertical, res["extracted"], enrichment, req.locale, trace=trace)
 
     # UBO 穿透（家办 / 信托 / 基金场景）：股权图相乘计算有效持股
@@ -153,7 +154,7 @@ async def pipeline_endpoint(req: PipelineReq, authorization: Optional[str] = Hea
         or res["extracted"].get("受保人")
     )
     run_id = store.record_run(
-        req.vertical.value, decision["action"], decision["risk_score"], name,
+        req.vertical, decision["action"], decision["risk_score"], name,
         extra={
             "locale": req.locale,
             "ocr_used": ocr_used,
@@ -240,6 +241,25 @@ def rules_export(version: Optional[str] = None, vertical: Optional[str] = None):
 @app.get("/v1/rules/version")
 def rules_version():
     return {"version": rules.RULE_PACK_VERSION, "count": len(rules.RULES)}
+
+
+@app.post("/v1/rules/{rule_id}/state")
+def rules_state(rule_id: str, body: dict):
+    """规则运行期治理（借鉴 marble 的 rule snooze）：
+
+    - ``enabled: false`` 停用（误报止血，免发版）；
+    - ``snoozed_until``: ISO 时间戳，休眠到指定时刻（数据源维护窗口等）；
+    - 传 ``enabled: true`` / ``snoozed_until: ""`` 恢复。
+    重启后恢复规则包原始状态（规则内容本身仍在代码里版本化）。
+    """
+    state = rules.set_rule_state(
+        rule_id,
+        enabled=body.get("enabled"),
+        snoozed_until=body.get("snoozed_until"),
+    )
+    if state is None:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return {"rule_id": rule_id, "state": state}
 
 
 @app.get("/v1/runs/{run_id}/audit")

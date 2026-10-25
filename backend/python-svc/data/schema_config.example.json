@@ -1,0 +1,18 @@
+{
+  "_说明": "抽取 schema 配置化示例（复制为 data/schema_config.json 后生效；SCHEMA_CONFIG 可指定其他路径）。fields 内 name 必填，type 可选 str/float/bool，aliases 会同时喂给正则兜底抽取。定义全新业务线（如 crypto_exchange）无需改代码、无需发版。",
+  "family_office": {
+    "fields": [
+      {"name": "资产规模港币万", "type": "float", "aliases": ["AUM", "管理资产规模"]},
+      {"name": "信托设立地", "type": "str", "aliases": ["设立地", "Trust Domicile"]}
+    ]
+  },
+  "crypto_exchange": {
+    "fields": [
+      {"name": "客户姓名或实体名称", "type": "str"},
+      {"name": "VASP牌照编号", "type": "str", "aliases": ["VASP Licence No"]},
+      {"name": "冷钱包托管方", "type": "str"},
+      {"name": "月交易额港币万", "type": "float"},
+      {"name": "KYC状态", "type": "str"}
+    ]
+  }
+}
